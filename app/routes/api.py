@@ -1,9 +1,10 @@
 import json
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.db import database_is_ready
+from app.services.clickstream_service import emit_interaction_event
 from app.services.interaction_service import create_interaction, get_recent_interactions
 from app.services.recommendation_service import get_recommendations
 
@@ -102,7 +103,34 @@ def interactions_create():
     except SQLAlchemyError:
         return jsonify(error="database_unavailable", message="No fue posible guardar la interacción."), 503
 
-    return jsonify(interaction=interaction), 201
+    # The OLTP write above is authoritative. Clickstream logging is intentionally
+    # best-effort so a temporary streaming problem never rejects user feedback.
+    stream_event = None
+    try:
+        stream_event = emit_interaction_event(
+            user_id=user_id,
+            movie_id=movie_id,
+            interaction_type=interaction_type,
+            rating=rating,
+            metadata=metadata,
+            request_id=request.headers.get("X-Request-ID"),
+        )
+    except OSError:
+        current_app.logger.exception("Could not append interaction to clickstream log")
+
+    return (
+        jsonify(
+            interaction=interaction,
+            stream_event={
+                "event_id": stream_event["event_id"],
+                "event_at": stream_event["event_at"],
+                "logged": True,
+            }
+            if stream_event
+            else {"logged": False},
+        ),
+        201,
+    )
 
 
 @api_bp.get("/interactions/<int:user_id>")
