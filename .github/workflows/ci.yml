@@ -44,6 +44,7 @@ jobs:
         run: |
           psql -h localhost -U recommender -d recommender -v ON_ERROR_STOP=1 -f database/schema/001_init.sql
           psql -h localhost -U recommender -d recommender -v ON_ERROR_STOP=1 -f database/schema/002_views.sql
+          psql -h localhost -U recommender -d recommender -v ON_ERROR_STOP=1 -f database/schema/003_user_interactions.sql
           psql -h localhost -U recommender -d recommender -v ON_ERROR_STOP=1 -f database/seeds/001_mock_data.sql
           psql -h localhost -U recommender -d recommender -v ON_ERROR_STOP=1 -f tests/sql/validate_database.sql
 

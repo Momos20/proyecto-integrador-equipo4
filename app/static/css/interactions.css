@@ -1,0 +1,72 @@
+.movie-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 0 15px 15px;
+}
+
+.feedback-button {
+    min-height: 38px;
+    border: 1px solid rgba(255,255,255,.10);
+    border-radius: 11px;
+    background: rgba(255,255,255,.035);
+    color: #c8cad4;
+    font-size: 11px;
+    font-weight: 700;
+    transition: .2s ease;
+}
+
+.feedback-button:hover {
+    border-color: rgba(167,139,250,.38);
+    background: rgba(139,92,246,.10);
+    color: #f7f7fb;
+}
+
+.feedback-button.is-selected {
+    border-color: rgba(110,231,183,.42);
+    background: rgba(110,231,183,.10);
+    color: #9ff4d1;
+}
+
+.feedback-button.is-negative.is-selected {
+    border-color: rgba(251,113,133,.40);
+    background: rgba(251,113,133,.10);
+    color: #fda4af;
+}
+
+.rating-control {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 9px;
+    align-items: center;
+    color: #85899a;
+    font-size: 10px;
+}
+
+.rating-control select {
+    width: 100%;
+    min-height: 36px;
+    padding: 0 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,.10);
+    background: #0d0e15;
+    color: #d9dbe4;
+    outline: none;
+}
+
+.rating-control select:focus {
+    border-color: rgba(139,92,246,.75);
+    box-shadow: 0 0 0 3px rgba(139,92,246,.12);
+}
+
+.feedback-note {
+    margin-top: 10px;
+    color: #737789;
+    font-size: 11px;
+}
+
+@media (max-width: 720px) {
+    .movie-actions { grid-template-columns: 1fr; }
+    .rating-control { grid-column: auto; grid-template-columns: 1fr; }
+}

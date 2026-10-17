@@ -29,6 +29,13 @@ BEGIN
     END IF;
 
     IF NOT EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'user_interactions'
+    ) THEN
+        RAISE EXCEPTION 'user_interactions table is missing';
+    END IF;
+
+    IF NOT EXISTS (
         SELECT 1 FROM information_schema.views
         WHERE table_schema = 'public' AND table_name = 'latest_recommendations'
     ) THEN

@@ -10,6 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/interactions.css') }}">
 </head>
 <body>
     <div class="noise" aria-hidden="true"></div>
@@ -40,11 +41,11 @@
     <main>
         <section class="hero shell">
             <div class="hero-copy">
-                <div class="eyebrow"><span class="live-dot"></span> Recomendación semanal · Top-K</div>
+                <div class="eyebrow"><span class="live-dot"></span> Actualización diaria · horizonte 7 días</div>
                 <h1>Tu próxima gran película,<br><span>antes de que la busques.</span></h1>
                 <p class="hero-text">
-                    Un sistema de recomendación sobre grafos que transforma el historial de interacción
-                    en una selección personalizada para la siguiente semana.
+                    CineGraph transforma tu historial y tus nuevas interacciones en una selección personalizada
+                    para los próximos 7 días, con un ranking que puede actualizarse cada día.
                 </p>
 
                 <div class="search-panel" id="searchPanel">
@@ -63,7 +64,7 @@
                     </form>
                     <div class="search-meta">
                         <span><svg viewBox="0 0 24 24"><path d="m9 12 2 2 4-4M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z"></path></svg> Ranking precalculado</span>
-                        <span><svg viewBox="0 0 24 24"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48 2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48 2.83-2.83"></path></svg> Baja latencia</span>
+                        <span><svg viewBox="0 0 24 24"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48 2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48 2.83-2.83"></path></svg> Feedback persistente</span>
                         <button type="button" class="demo-link" id="demoButton">Probar usuario {{ demo_user_id }}</button>
                     </div>
                 </div>
@@ -92,7 +93,7 @@
                     </div>
                     <div class="graph-footer">
                         <div><span>Modelo</span><strong>GraphSAGE</strong></div>
-                        <div><span>Serving</span><strong>Batch Top-K</strong></div>
+                        <div><span>Serving</span><strong>Batch Top-K diario</strong></div>
                     </div>
                 </div>
             </div>
@@ -102,8 +103,8 @@
             <div class="results-heading">
                 <div>
                     <div class="eyebrow small">Selección personalizada</div>
-                    <h2>Tu Top <span id="resultCount">10</span> de esta semana</h2>
-                    <p>Ordenado por afinidad estimada para el usuario <strong id="resultUser">—</strong>.</p>
+                    <h2>Tu Top <span id="resultCount">10</span> para los próximos 7 días</h2>
+                    <p>Ordenado por afinidad estimada para el usuario <strong id="resultUser">—</strong>. Tus acciones se guardan para el siguiente ciclo.</p>
                 </div>
                 <div class="model-summary" id="modelSummary">
                     <div class="summary-item"><span>Modelo</span><strong id="modelName">—</strong></div>
@@ -112,6 +113,7 @@
                 </div>
             </div>
             <div class="movie-grid" id="movieGrid"></div>
+            <p class="feedback-note">Me interesa, No me interesa, Mi lista y las calificaciones se registran como eventos de feedback en PostgreSQL.</p>
         </section>
 
         <section class="loading-section shell" id="loadingSection" hidden aria-live="polite">
@@ -133,10 +135,10 @@
         <section class="architecture-strip shell">
             <div class="architecture-copy">
                 <span class="eyebrow small">Cómo llega una recomendación</span>
-                <h3>ML potente detrás. Una experiencia rápida delante.</h3>
+                <h3>ML potente detrás. Feedback real delante.</h3>
             </div>
             <div class="pipeline" aria-label="Pipeline de recomendación">
-                <span>S3 Features</span><i>→</i><span>SageMaker</span><i>→</i><span>Top-K</span><i>→</i><span>RDS</span><i>→</i><span class="pipeline-active">Flask</span>
+                <span>Feedback</span><i>→</i><span>RDS</span><i>→</i><span>S3 Features</span><i>→</i><span>SageMaker</span><i>→</i><span>Top-K</span><i>→</i><span class="pipeline-active">Flask</span>
             </div>
         </section>
     </main>
