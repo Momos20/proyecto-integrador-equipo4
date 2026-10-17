@@ -46,9 +46,52 @@ Flask / EC2
 Usuario
 ```
 
+## Estructura del repositorio
+
+```text
+.
+├── app/                    # Aplicación Flask y capa de negocio
+├── data-platform/          # Ingesta, curated, features, publish y orquestación
+├── ml/                     # Training, evaluación, inferencia y cold start
+├── database/               # Esquema, migraciones y seeds de PostgreSQL
+├── infrastructure/         # AWS, Step Functions y Docker
+├── monitoring/             # CloudWatch, drift y métricas operativas
+├── tests/                  # Pruebas automatizadas
+├── scripts/                # Utilidades reproducibles
+├── docs/architecture/      # Documentación de arquitectura
+└── .github/workflows/      # CI/CD
+```
+
+## Desarrollo local
+
+1. Copiar `.env.example` a `.env` y ajustar los valores locales.
+2. Crear un entorno virtual e instalar dependencias:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+3. Ejecutar la aplicación:
+
+```bash
+flask --app app.main run --debug
+```
+
+También se incluye `docker-compose.yml` para levantar PostgreSQL y la aplicación localmente.
+
+## Ramas
+
+- `main`: versión estable y demostrable.
+- `develop`: integración del equipo.
+- `feature/*`: trabajo por funcionalidad.
+
+Los cambios relevantes deben llegar a `main` mediante Pull Request.
+
 ## Estado del proyecto
 
-Arquitectura objetivo definida. El repositorio se encuentra en la etapa inicial de estructuración e implementación.
+Arquitectura objetivo definida y estructura inicial del repositorio creada. Próxima etapa: implementar el pipeline de datos y la aplicación mínima end-to-end.
 
 ## Equipo 4
 
