@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.DS_Store
+.vscode/
+.idea/
+
+# ML / data artifacts (store in S3, not Git)
+*.csv
+*.parquet
+*.pt
+*.pth
+*.ckpt
+*.tar.gz
+mlruns/
+artifacts/
+data/local/
+
+# Build / logs
+build/
+dist/
+*.log
