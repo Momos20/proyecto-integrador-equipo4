@@ -1,1 +1,1 @@
-"""Rutas HTTP de la aplicación Flask."""
+"""HTTP routes for the recommendation application."""
