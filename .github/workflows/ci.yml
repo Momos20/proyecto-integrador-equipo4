@@ -8,14 +8,44 @@ on:
 jobs:
   test-app:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: recommender
+          POSTGRES_USER: recommender
+          POSTGRES_PASSWORD: recommender
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U recommender -d recommender"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGPASSWORD: recommender
+      DATABASE_URL: postgresql://recommender:recommender@localhost:5432/recommender
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install dependencies
+
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt pytest
-      - name: Run tests
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Initialize and validate database
+        run: |
+          psql -h localhost -U recommender -d recommender -v ON_ERROR_STOP=1 -f database/schema/001_init.sql
+          psql -h localhost -U recommender -d recommender -v ON_ERROR_STOP=1 -f database/schema/002_views.sql
+          psql -h localhost -U recommender -d recommender -v ON_ERROR_STOP=1 -f database/seeds/001_mock_data.sql
+          psql -h localhost -U recommender -d recommender -v ON_ERROR_STOP=1 -f tests/sql/validate_database.sql
+
+      - name: Run application tests
         run: pytest -q
