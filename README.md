@@ -46,17 +46,36 @@ Flask / EC2
 Usuario
 ```
 
+## MVP local funcional
+
+El repositorio ya incluye una primera versión end-to-end del serving operacional:
+
+```text
+Usuario → CineGraph (Flask/Jinja/JS) → API Flask → PostgreSQL → Top-K
+```
+
+La interfaz **CineGraph** presenta un diseño oscuro/cinematográfico, tarjetas de recomendación, metadata del modelo y manejo visual de estados de carga y usuarios sin ranking.
+
+### Endpoints
+
+- `GET /health`: liveness de la aplicación.
+- `GET /api/ready`: readiness de la aplicación y PostgreSQL.
+- `GET /api/recommendations/<user_id>`: devuelve el ranking más reciente del usuario.
+- `GET /api/recommendations/<user_id>?limit=3`: permite limitar el Top-K entre 1 y 50.
+
+El usuario de demostración cargado por el seed local es `414`.
+
 ## Estructura del repositorio
 
 ```text
 .
-├── app/                    # Aplicación Flask y capa de negocio
+├── app/                    # Aplicación Flask, API, servicios y experiencia web
 ├── data-platform/          # Ingesta, curated, features, publish y orquestación
 ├── ml/                     # Training, evaluación, inferencia y cold start
 ├── database/               # Esquema, migraciones y seeds de PostgreSQL
 ├── infrastructure/         # AWS, Step Functions y Docker
 ├── monitoring/             # CloudWatch, drift y métricas operativas
-├── tests/                  # Pruebas automatizadas
+├── tests/                  # Pruebas automatizadas e integración con PostgreSQL
 ├── scripts/                # Utilidades reproducibles
 ├── docs/architecture/      # Documentación de arquitectura
 └── .github/workflows/      # CI/CD
@@ -64,22 +83,30 @@ Usuario
 
 ## Desarrollo local
 
-1. Copiar `.env.example` a `.env` y ajustar los valores locales.
-2. Crear un entorno virtual e instalar dependencias:
+La forma más sencilla de probar el MVP completo es con Docker:
+
+```bash
+cp .env.example .env
+docker compose down -v
+docker compose up --build
+```
+
+Luego abrir:
+
+```text
+http://localhost:8000
+```
+
+La base de datos se inicializa automáticamente con el esquema y las recomendaciones mock del usuario `414`.
+
+Para desarrollo Python fuera de Docker:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-```
-
-3. Ejecutar la aplicación:
-
-```bash
 flask --app app.main run --debug
 ```
-
-También se incluye `docker-compose.yml` para levantar PostgreSQL y la aplicación localmente.
 
 ## Ramas
 
@@ -91,7 +118,7 @@ Los cambios relevantes deben llegar a `main` mediante Pull Request.
 
 ## Estado del proyecto
 
-Arquitectura objetivo definida y estructura inicial del repositorio creada. Próxima etapa: implementar el pipeline de datos y la aplicación mínima end-to-end.
+Arquitectura objetivo definida, persistencia operacional implementada y MVP Flask + PostgreSQL funcional. La siguiente etapa es construir el pipeline de datos `MovieLens/TMDB → S3 Raw → Glue Curated → Features` y posteriormente sustituir el seed mock por las predicciones batch del modelo.
 
 ## Equipo 4
 
