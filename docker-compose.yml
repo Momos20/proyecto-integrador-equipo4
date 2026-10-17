@@ -27,11 +27,31 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql+psycopg://recommender:recommender@db:5432/recommender
+      CLICKSTREAM_LOG_PATH: /app/logs/clickstream.log
     ports:
       - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - clickstream_logs:/app/logs
+
+  # Optional locally; enabled on the AWS EC2 deployment with:
+  # docker compose --profile aws-streaming up -d kinesis-agent
+  kinesis-agent:
+    profiles: ["aws-streaming"]
+    build:
+      context: .
+      dockerfile: infrastructure/docker/kinesis-agent.Dockerfile
+    environment:
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      KINESIS_STREAM_NAME: ${KINESIS_STREAM_NAME:-cinegraph-clickstream}
+    volumes:
+      - clickstream_logs:/var/log/cinegraph:ro
+    depends_on:
+      - app
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+  clickstream_logs:
