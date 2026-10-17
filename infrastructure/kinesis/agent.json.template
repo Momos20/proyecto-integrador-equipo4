@@ -1,0 +1,13 @@
+{
+  "cloudwatch.emitMetrics": true,
+  "kinesis.endpoint": "kinesis.__AWS_REGION__.amazonaws.com",
+  "cloudwatch.endpoint": "monitoring.__AWS_REGION__.amazonaws.com",
+  "flows": [
+    {
+      "filePattern": "/var/log/cinegraph/clickstream.log*",
+      "kinesisStream": "__KINESIS_STREAM_NAME__",
+      "initialPosition": "END_OF_FILE",
+      "maxBufferAgeMillis": 5000
+    }
+  ]
+}
