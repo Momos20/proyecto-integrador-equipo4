@@ -16,7 +16,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./database/schema/001_init.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
       - ./database/schema/002_views.sql:/docker-entrypoint-initdb.d/02_views.sql:ro
-      - ./database/seeds/001_mock_data.sql:/docker-entrypoint-initdb.d/03_seed.sql:ro
+      - ./database/schema/003_user_interactions.sql:/docker-entrypoint-initdb.d/03_interactions.sql:ro
+      - ./database/seeds/001_mock_data.sql:/docker-entrypoint-initdb.d/04_seed.sql:ro
 
   app:
     build:
