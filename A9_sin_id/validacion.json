@@ -1,0 +1,24 @@
+{
+  "mejor_paso": 1600,
+  "config": {
+    "atributos_semanales": true,
+    "capas": 2,
+    "dimension": 64,
+    "dropout": 0.1,
+    "evaluar_cada": 100,
+    "max_pasos": 3000,
+    "max_positivos_por_paso": 20000,
+    "negativos": "uniforme",
+    "normalizar": false,
+    "optimizador": "adam",
+    "paciencia": 5,
+    "semilla": 0,
+    "tasa_aprendizaje": 0.01,
+    "usar_id": false,
+    "ventana": 13,
+    "vida_media": null,
+    "weight_decay": 0.0,
+    "desde": "A8_dropout",
+    "cambio": "usar_id=false"
+  }
+}
