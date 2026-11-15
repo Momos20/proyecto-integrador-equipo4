@@ -34,6 +34,10 @@ Las métricas son **las que vienen en los archivos**, no una evaluación indepen
 
 El protocolo objetivo de CineGraph usa **snapshot diario, horizonte de 7 días y scoring diario**. El archivo de A9 declara `atributos_semanales=true` y `ventana=13`; Miguel debe verificar si la entrada actual y el target corresponden a ese protocolo o si se requiere adaptar el procesamiento/modelo. Esto **no invalida el checkpoint como versión de modelo**.
 
+Miguel entregó el ZIP **A9_topk_diario.zip** con la implementación de `src.recomendar`, `src.diario`, utilidades, pruebas y resultados. Véase [la revisión de la entrega](../../docs/revision-a9-miguel.md). El checkpoint, configuración y curva del ZIP son idénticos a estos archivos (SHA Git sin cambios).
+
+**La integración con CineGraph está preparada, pero todavía no conectada al endpoint:** el paquete implementa cortes diarios con objetivo **del mismo día**, mientras el protocolo vigente exige un corte diario con predicción para los **siguientes 7 días**. Se deben generar y validar etiquetas del horizonte de 7 días sin fuga temporal. Las métricas informadas son de evaluación retrospectiva y no validación independiente.
+
 Para integrar A9 sin inventar resultados hacen falta al menos:
 
 1. La clase/arquitectura y el código para cargar `modelo.pt` de forma segura y reconstruir el modelo.
