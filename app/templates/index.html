@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#09090f">
-    <meta name="description" content="CineGraph: prototipo de recomendaciones y modelos GraphSAGE del Equipo 4, con feedback y arquitectura MLOps en AWS.">
+    <meta name="description" content="CineGraph: modelo GraphSAGE A9_sin_id seleccionado, integración de recomendaciones y feedback con arquitectura AWS MLOps.">
     <title>CineGraph · Recomendador inteligente</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -41,11 +41,11 @@
     <main>
         <section class="hero shell">
             <div class="hero-copy">
-                <div class="eyebrow"><span class="live-dot"></span> Prototipo · modelos del equipo recibidos</div>
+                <div class="eyebrow"><span class="live-dot"></span> Modelo seleccionado · A9_sin_id</div>
                 <h1>Tu próxima gran película,<br><span>antes de que la busques.</span></h1>
                 <p class="hero-text">
-                    Explora el ranking de demostración y registra tus preferencias. El modelo GraphSAGE de Miguel
-                    ya está disponible en el repositorio; conectarlo al scoring diario con horizonte de 7 días es el siguiente paso.
+                    CineGraph integrará GraphSAGE A9_sin_id para generar recomendaciones actualizadas diariamente
+                    con horizonte de 7 días. Mientras terminamos esa conexión, puedes probar el ranking y guardar tus preferencias.
                 </p>
 
                 <div class="search-panel" id="searchPanel">
@@ -92,8 +92,8 @@
                         </svg>
                     </div>
                     <div class="graph-footer">
-                        <div><span>Modelo recibido</span><strong>A9_sin_id</strong></div>
-                        <div><span>Ranking activo</span><strong>Demo · baseline-v0</strong></div>
+                        <div><span>Modelo seleccionado</span><strong>A9_sin_id</strong></div>
+                        <div><span>Estado</span><strong>Integración pendiente</strong></div>
                     </div>
                 </div>
             </div>
@@ -102,34 +102,24 @@
         <section class="model-showcase shell" aria-labelledby="modelShowcaseTitle">
             <div class="model-showcase-heading">
                 <div>
-                    <div class="eyebrow small">Modelos del equipo · archivos entregados por Miguel</div>
-                    <h2 id="modelShowcaseTitle">Dos versiones, una integración pendiente</h2>
-                    <p>Los modelos están en el repositorio. Sus métricas son resultados registrados; todavía no son las recomendaciones que sirve esta página.</p>
+                    <div class="eyebrow small">Nuestro modelo · GraphSAGE</div>
+                    <h2 id="modelShowcaseTitle">Una arquitectura para recomendar mejor</h2>
+                    <p>Trabajamos con una sola versión candidata para CineGraph, mientras completamos la integración del motor predictivo.</p>
                 </div>
             </div>
             <div class="model-showcase-grid">
                 <article class="model-showcase-card model-showcase-primary">
-                    <div class="model-showcase-top"><span class="model-state model-state-ready">Checkpoint disponible</span><span class="model-showcase-code">A9_sin_id</span></div>
+                    <div class="model-showcase-top"><span class="model-state model-state-ready">Modelo seleccionado · pendiente de conexión</span><span class="model-showcase-code">A9_sin_id</span></div>
                     <h3>GraphSAGE sin identificadores</h3>
-                    <p>Checkpoint <code>modelo.pt</code> y configuración de dos capas, dimensión 64 y atributos semanales. Selección reportada en el paso 1600.</p>
+                    <p>Checkpoint de Miguel disponible. Dos capas, dimensión 64 y representación sin IDs. La configuración entregada utiliza atributos semanales; falta validar su adaptación al scoring diario con horizonte de 7 días.</p>
                     <div class="model-showcase-metrics">
-                        <div><strong>0,1390</strong><span>Recall@20</span></div>
-                        <div><strong>0,0915</strong><span>NDCG@20</span></div>
+                        <div><strong>0,1390</strong><span>Recall@20 · validación registrada</span></div>
+                        <div><strong>0,0915</strong><span>NDCG@20 · validación registrada</span></div>
                     </div>
-                    <p class="model-showcase-note">Disponible en GitHub; falta el código de inferencia y validar el protocolo diario antes de conectarlo a RDS.</p>
-                </article>
-                <article class="model-showcase-card">
-                    <div class="model-showcase-top"><span class="model-state">Curva disponible</span><span class="model-showcase-code">A0_base</span></div>
-                    <h3>Modelo base</h3>
-                    <p>Se recibió la curva de entrenamiento y validación. No se adjuntó un archivo de pesos para ejecutar inferencia con esta versión.</p>
-                    <div class="model-showcase-metrics">
-                        <div><strong>0,0292</strong><span>Recall@20 máximo registrado</span></div>
-                        <div><strong>0,0145</strong><span>NDCG@20 máximo registrado</span></div>
-                    </div>
-                    <p class="model-showcase-note">Los máximos de esta curva no demuestran por sí solos una comparación controlada con A9.</p>
+                    <p class="model-showcase-note">Los resultados pertenecen a la curva recibida. El Top-10 de demostración todavía no se calcula con este checkpoint.</p>
                 </article>
             </div>
-            <p class="model-showcase-footnote">En servicio ahora: <strong>PopularityBaseline · baseline-v0</strong>, con datos de ejemplo. El objetivo de producción sigue siendo scoring diario para un horizonte de 7 días.</p>
+            <p class="model-showcase-footnote"><strong>Próxima integración:</strong> preparación de entradas, carga del modelo, generación del Top-K y publicación en PostgreSQL. Las interacciones de la web ya se almacenan.</p>
         </section>
 
         <section class="results-section shell" id="resultsSection" hidden>
@@ -137,11 +127,11 @@
                 <div>
                     <div class="eyebrow small">Ranking disponible en la base de datos</div>
                     <h2>Tu Top <span id="resultCount">10</span> de películas</h2>
-                    <p>Ranking precalculado para el usuario <strong id="resultUser">—</strong>. Comprueba el modelo y la fecha de corte indicados a la derecha.</p>
+                    <p>Ranking disponible para el usuario <strong id="resultUser">—</strong>. Se indica si se trata de datos de demostración o predicciones del modelo.</p>
                 </div>
                 <div class="model-summary" id="modelSummary">
-                    <div class="summary-item"><span>Modelo</span><strong id="modelName">—</strong></div>
-                    <div class="summary-item"><span>Versión</span><strong id="modelVersion">—</strong></div>
+                    <div class="summary-item"><span>Origen</span><strong id="modelName">—</strong></div>
+                    <div class="summary-item"><span>Publicación</span><strong id="modelVersion">—</strong></div>
                     <div class="summary-item"><span>Corte</span><strong id="cutoffWeek">—</strong></div>
                 </div>
             </div>

@@ -76,7 +76,7 @@
 .model-showcase { padding: 0 0 28px; }
 .model-showcase-heading h2 { margin: 7px 0 8px; font: 800 clamp(23px, 3vw, 31px)/1.2 "Manrope",sans-serif; letter-spacing: -.9px; }
 .model-showcase-heading p { max-width: 780px; margin: 0 0 20px; color: var(--muted); font-size: 13px; line-height: 1.7; }
-.model-showcase-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 17px; }
+.model-showcase-grid { display: grid; grid-template-columns: minmax(0,1fr); gap: 17px; max-width: 860px; }
 .model-showcase-card { border-radius: 20px; border: 1px solid rgba(255,255,255,.09); padding: 22px; background: linear-gradient(145deg,rgba(28,29,43,.82),rgba(15,17,27,.94)); min-width: 0; }
 .model-showcase-card.model-showcase-primary { border-color: rgba(167,139,250,.27); background: linear-gradient(130deg,rgba(63,42,107,.25),rgba(15,17,27,.92)); }
 .model-showcase-top { display:flex; justify-content: space-between; gap: 12px; align-items:center; flex-wrap:wrap; margin-bottom: 15px; }
