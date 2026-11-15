@@ -34,6 +34,12 @@ El diagrama editable se encuentra en:
 docs/architecture/arquitectura_aws_cinegraph_kinesis.drawio
 ```
 
+## Datos MovieLens 32M verificados (modelo de Miguel)
+
+El repositorio ya incluye `links.csv` y el catálogo `movies.csv` dividido en tres partes reconstruibles **idénticas al original**. Se conservaron el README y los checksums oficiales. Se verificó `tags.csv` (72 MB), pero se mantiene fuera de Git por tamaño; no es necesario para ejecutar el núcleo de GraphSAGE A9. El archivo de ratings **no fue incluido** en la última entrega: reutilizaremos el `ratings_clean.parquet` existente en el equipo.
+
+La [guía de datos para A9](data/reference/movielens32m/README.md) incluye el comando `python scripts/data/prepare_miguel_a9.py --ratings-parquet RUTA`, que produce la estructura `ml/a9_daily/data/processed/` que espera Miguel **sin reentrenar ni modificar el protocolo del modelo**. Todo el flujo es manual y GitHub Actions sigue desactivado automáticamente.
+
 ## Modelos del equipo y estado actual
 
 Miguel entregó los archivos de `A0_base` y `A9_sin_id`, organizados en [`ml/models/`](ml/models/README.md). **A9 contiene un checkpoint `modelo.pt`** y métricas de validación registradas (Recall@20 0.138956; NDCG@20 0.091508 en el paso 1600). **A0 solo tiene su curva**. Se conservaron los archivos originales.
