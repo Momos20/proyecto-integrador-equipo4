@@ -33,3 +33,12 @@ data/local/
 build/
 dist/
 *.log
+
+# Version-controlled MovieLens metadata (reassembled and checksum verified)
+!data/reference/movielens32m/links.csv
+!data/reference/movielens32m/parts/movies.part*.csv
+
+# Never commit large local inputs or processed Parquet
+data/raw/
+data/processed/
+ml/a9_daily/data/
