@@ -1,0 +1,42 @@
+# Opt-in local AWS emulator. Does not modify normal docker compose usage.
+# Start explicitly: docker compose -f docker-compose.yml -f docker-compose.floci.yml --profile floci up -d floci
+services:
+  floci:
+    profiles: ["floci"]
+    image: floci/floci:2.5.0
+    ports:
+      - "127.0.0.1:4566:4566"
+    environment:
+      FLOCI_HOSTNAME: floci
+      FLOCI_DEFAULT_REGION: us-east-1
+      FLOCI_STORAGE_MODE: persistent
+      FLOCI_STORAGE_PERSISTENT_PATH: /app/data
+      # Emulator-only: flush a Firehose buffer as soon as it has 1 record.
+      FLOCI_SERVICES_FIREHOSE_FLUSH_RECORD_COUNT: "1"
+    volumes:
+      - floci_data:/app/data
+
+  floci-tools:
+    profiles: ["floci"]
+    build:
+      context: .
+      dockerfile: infrastructure/docker/floci-tools.Dockerfile
+    environment:
+      AWS_ENDPOINT_URL: http://floci:4566
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: localtest
+      AWS_SECRET_ACCESS_KEY: localtest
+      AWS_EC2_METADATA_DISABLED: "true"
+      S3_BUCKET: cinegraph-local-datalake
+      KINESIS_STREAM_NAME: cinegraph-clickstream
+      FIREHOSE_DELIVERY_STREAM: cinegraph-clickstream-to-s3
+    volumes:
+      - clickstream_logs:/app/logs:ro
+      - floci_ship_state:/state
+    depends_on:
+      - floci
+
+volumes:
+  floci_data:
+  floci_ship_state:

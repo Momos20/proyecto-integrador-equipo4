@@ -116,6 +116,20 @@ Las interacciones quedan persistidas en `user_interactions` y, simultáneamente,
 
 El usuario de demostración cargado por el seed local es `414`.
 
+## Pruebas de AWS en local con Floci
+
+Se añadió un laboratorio optativo con [Floci 2.5.0](https://github.com/floci-io/floci), que emula Kinesis, Data Firehose y S3 y permite verificar la ruta del clickstream antes de desplegar recursos AWS reales. **No se inicia con el Compose normal ni dispara pipelines**. Guía paso a paso: [docs/floci-local.md](docs/floci-local.md).
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.floci.yml --profile floci up -d floci
+docker compose -f docker-compose.yml -f docker-compose.floci.yml --profile floci run --rm floci-tools bootstrap
+# Genera una interaccion desde la pagina (http://localhost:8000)
+docker compose -f docker-compose.yml -f docker-compose.floci.yml --profile floci run --rm floci-tools ship
+docker compose -f docker-compose.yml -f docker-compose.floci.yml --profile floci run --rm floci-tools verify
+```
+
+El publicador de laboratorio es **manual**; el Kinesis Agent de EC2 no se modifica. Glue/SageMaker scoring diario siguen pendientes de implementación y datos de Miguel.
+
 ## Streaming en AWS
 
 La ejecución local normal no requiere Kinesis. En EC2, después de crear el stream y otorgar permisos al rol de instancia, se activa el perfil:
