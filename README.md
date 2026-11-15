@@ -9,7 +9,7 @@ La solución se diseña como una plataforma **MLOps end-to-end** con dos flujos 
 - **Histórico/batch:** MovieLens 32M y TMDB → S3 → Glue → Features → SageMaker.
 - **Behavioral/streaming:** CineGraph → `clickstream.log` → Kinesis Agent → Kinesis Data Streams → Data Firehose → S3 Raw.
 
-El scoring de recomendaciones se ejecuta diariamente; el reentrenamiento de GraphSAGE es periódico o condicionado y **no ocurre por cada clic**.
+El diseño objetivo prevé **scoring diario**, con reentrenamiento periódico o condicionado; **ningún entrenamiento ni scoring de GraphSAGE se inicia por cada clic**. Por ahora, la aplicación consulta Top-K precalculado desde PostgreSQL.
 
 ## Arquitectura objetivo
 
@@ -19,7 +19,7 @@ El scoring de recomendaciones se ejecuta diariamente; el reentrenamiento de Grap
 - **Streaming:** Kinesis Agent + Amazon Kinesis Data Streams + Amazon Data Firehose.
 - **Procesamiento:** AWS Glue.
 - **Orquestación:** Amazon EventBridge + AWS Step Functions.
-- **Modelo:** GraphSAGE con PyTorch / PyTorch Geometric.
+- **Modelo:** GraphSAGE con PyTorch / PyTorch Geometric. Miguel aportó versiones bajo `ml/models/`.
 - **Entrenamiento y evaluación:** Amazon SageMaker AI.
 - **Inferencia principal:** scoring batch diario Top-K.
 - **Cold start:** GraphSAGE inductivo + contenido; fallback de popularidad cuando la señal sea insuficiente.
@@ -33,6 +33,14 @@ El diagrama editable se encuentra en:
 ```text
 docs/architecture/arquitectura_aws_cinegraph_kinesis.drawio
 ```
+
+## Modelos del equipo y estado actual
+
+Miguel entregó los archivos de `A0_base` y `A9_sin_id`, organizados en [`ml/models/`](ml/models/README.md). **A9 contiene un checkpoint `modelo.pt`** y métricas de validación registradas (Recall@20 0.138956; NDCG@20 0.091508 en el paso 1600). **A0 solo tiene su curva**. Se conservaron los archivos originales.
+
+La configuración de A9 señala `atributos_semanales=true` y aún debe comprobarse su compatibilidad con el protocolo diario de siete días. El checkpoint todavía no está conectado a un proceso de scoring, por lo que el Top-10 de demostración que devuelve PostgreSQL corresponde a `PopularityBaseline` (`baseline-v0`) y **no a GraphSAGE A9**.
+
+El workflow CI de GitHub Actions permanece disponible **solo mediante ejecución manual** desde «Run workflow»; un push o PR no lo dispara.
 
 ## Diseño temporal
 
@@ -132,7 +140,7 @@ docs/data/clickstream_schema.md
 .
 ├── app/                    # Aplicación Flask, API, servicios y experiencia web
 ├── data-platform/          # Ingesta, curated, features, publish y orquestación
-├── ml/                     # Training, evaluación, inferencia y cold start
+├── ml/                     # Modelos A0/A9, training, evaluación, inferencia y cold start
 ├── database/               # Esquema, migraciones y seeds de PostgreSQL
 ├── infrastructure/         # AWS, Kinesis, Step Functions y Docker
 ├── monitoring/             # CloudWatch, drift y métricas operativas
@@ -180,7 +188,7 @@ Los cambios relevantes deben llegar a `main` mediante Pull Request.
 
 ## Estado del proyecto
 
-MVP Flask + PostgreSQL con feedback operacional funcional. El backend ya produce clickstream JSONL y el repositorio incluye la configuración del Kinesis Agent para enviar eventos behavioral hacia Kinesis Data Streams y Firehose. La siguiente fase de infraestructura es desplegar los recursos AWS y construir `Raw → Curated → Features → scoring diario`.
+MVP Flask + PostgreSQL con feedback operacional funcional. El backend produce clickstream JSONL y el repositorio incluye configuración de Kinesis Agent. Se recibieron los modelos de Miguel y se organizaron en `ml/models/`; el checkpoint A9 aún necesita su código de inferencia y el proceso de generación de Top-K antes de sustituir el seed de demostración. El despliegue de recursos AWS y el pipeline `Raw → Curated → Features → scoring diario` siguen pendientes.
 
 ## Equipo 4
 

@@ -1,16 +1,18 @@
 # Machine Learning
 
-Esta carpeta contiene los componentes de entrenamiento, evaluación, inferencia y arranque en frío del recomendador GraphSAGE (PyTorch/PyG) que se integrará con SageMaker AI.
+Aquí están **los modelos recibidos de Miguel** y los componentes de entrenamiento, evaluación, inferencia y arranque en frío que se usarán para integrarlos con la aplicación y SageMaker.
 
-## Organización
+## Estructura
 
-- `training/`: código reproducible de entrenamiento (cuando se incorpore).
-- `evaluation/`: código de evaluación y métricas de ranking.
-- `inference/`: código de scoring y exportación de Top-K.
+- `models/`: versiones de modelos y sus artefactos tal como fueron entregados.
+- `training/`: código reproducible de entrenamiento, pendiente de incorporación.
+- `evaluation/`: evaluación y métricas de ranking.
+- `inference/`: scoring y generación de Top-K, pendiente de incorporación.
 - `cold_start/`: estrategias de arranque en frío.
 - `containers/`: empaquetado para SageMaker.
-- `experiments/`: artefactos históricos de las ejecuciones compartidas por Miguel, separados del código productivo.
 
-Consulta `experiments/README.md` para la procedencia y las limitaciones de los artefactos. La presencia de un `modelo.pt` en Git no significa que haya sido promovido a `champion` ni que se vaya a ejecutar automáticamente.
+Consulta `models/README.md` para la descripción de `A0_base` y `A9_sin_id`. **A9 sí tiene un checkpoint `modelo.pt`**; la versión A0, por ahora, solo cuenta con su curva. No se les ha modificado el contenido ni activado ejecución automática.
 
-**Ejecución de pipelines:** los workflows de GitHub Actions están configurados solo con `workflow_dispatch`; deben iniciarse manualmente desde la pestaña Actions.
+El flujo actual de la web sigue consultando los rankings que haya en PostgreSQL (el seed de demostración usa `PopularityBaseline`). Tener un checkpoint guardado no equivale a haberlo registrado como campeón ni a contar con un servicio de inferencia que produzca Top-K.
+
+El workflow de GitHub Actions se ejecuta **solo manualmente** mediante `workflow_dispatch`; no se inicia automáticamente con push o pull request.
