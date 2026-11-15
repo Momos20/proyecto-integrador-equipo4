@@ -8,6 +8,7 @@ const loadingSection = document.getElementById("loadingSection");
 const emptyState = document.getElementById("emptyState");
 const movieGrid = document.getElementById("movieGrid");
 const toast = document.getElementById("toast");
+const servingNotice = document.getElementById("servingNotice");
 
 const palette = [["#312e81","#7c3aed","#0f172a"],["#7f1d1d","#be123c","#18181b"],["#164e63","#0891b2","#0f172a"],["#3f3f46","#52525b","#09090b"],["#581c87","#a21caf","#111827"],["#064e3b","#047857","#111827"],["#78350f","#b45309","#18181b"]];
 let activeUserId = null;
@@ -17,7 +18,7 @@ function escapeHtml(value){return String(value).replaceAll("&","&amp;").replaceA
 function posterGradient(movieId){const colors=palette[Math.abs(Number(movieId))%palette.length];return `linear-gradient(145deg, ${colors[0]} 0%, ${colors[1]} 48%, ${colors[2]} 100%)`;}
 function shortPosterTitle(title){const clean=String(title).replace(/\s*\([^)]*\)\s*$/,"");return clean.length>38?`${clean.slice(0,35)}…`:clean;}
 function showToast(message){toast.textContent=message;toast.classList.add("visible");window.clearTimeout(showToast.timer);showToast.timer=window.setTimeout(()=>toast.classList.remove("visible"),3200);}
-function setLoading(isLoading){loadingSection.hidden=!isLoading;submitButton.disabled=isLoading;submitButton.querySelector("span").textContent=isLoading?"Calculando…":"Descubrir mi Top 10";if(isLoading){resultsSection.hidden=true;emptyState.hidden=true;}}
+function setLoading(isLoading){loadingSection.hidden=!isLoading;submitButton.disabled=isLoading;submitButton.querySelector("span").textContent=isLoading?"Cargando…":"Descubrir mi Top 10";if(isLoading){resultsSection.hidden=true;emptyState.hidden=true;}}
 
 function interactionMetadata(card){
     const position=Number(card?.dataset.rank||0)||null;
@@ -53,9 +54,17 @@ function renderRecommendations(data){
     document.getElementById("modelName").textContent=data.model?.name||"—";
     document.getElementById("modelVersion").textContent=data.model?.version||"—";
     document.getElementById("cutoffWeek").textContent=activeRecommendationContext.cutoffDate||"—";
+    const currentModel=(data.model?.name||"").toLowerCase();
+    const currentVersion=(data.model?.version||"").toLowerCase();
+    const demoModel=currentVersion==="baseline-v0"||currentModel==="popularitybaseline";
+    servingNotice.hidden=false;
+    servingNotice.textContent=demoModel
+        ?"Estás viendo un ranking de demostración de PopularityBaseline (baseline-v0). A9_sin_id todavía no está conectado a este Top-K."
+        :"Ranking generado con el modelo y la versión mostrados arriba. Los puntajes son scores de ranking, no necesariamente probabilidades.";
     movieGrid.innerHTML=data.recommendations.map(movie=>{
         const genres=(movie.genres||[]).slice(0,3).map(g=>`<span class="genre-chip">${escapeHtml(g)}</span>`).join("");
-        const score=`${Math.round(Number(movie.score)*100)}% match`;
+        const scoreValue=Number(movie.score);
+        const score=Number.isFinite(scoreValue)?`Score ${scoreValue.toFixed(3)}`:"Score n/d";
         return `<article class="movie-card" data-movie-id="${movie.movie_id}" data-rank="${movie.rank}">
             <div class="poster" style="--poster-gradient:${posterGradient(movie.movie_id)}"><span class="rank-badge">#${movie.rank}</span><span class="score-badge">${score}</span><div class="poster-title">${escapeHtml(shortPosterTitle(movie.title))}</div></div>
             <div class="movie-info"><h3 class="movie-title" title="${escapeHtml(movie.title)}">${escapeHtml(movie.title)}</h3><span class="movie-year">${movie.release_year||"Año n/d"}</span><div class="genre-list">${genres}</div></div>

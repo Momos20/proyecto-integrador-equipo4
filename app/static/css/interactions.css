@@ -70,3 +70,33 @@
     .movie-actions { grid-template-columns: 1fr; }
     .rating-control { grid-column: auto; grid-template-columns: 1fr; }
 }
+
+
+/* Sección de modelos recibidos (independiente del ranking en RDS). */
+.model-showcase { padding: 0 0 28px; }
+.model-showcase-heading h2 { margin: 7px 0 8px; font: 800 clamp(23px, 3vw, 31px)/1.2 "Manrope",sans-serif; letter-spacing: -.9px; }
+.model-showcase-heading p { max-width: 780px; margin: 0 0 20px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+.model-showcase-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 17px; }
+.model-showcase-card { border-radius: 20px; border: 1px solid rgba(255,255,255,.09); padding: 22px; background: linear-gradient(145deg,rgba(28,29,43,.82),rgba(15,17,27,.94)); min-width: 0; }
+.model-showcase-card.model-showcase-primary { border-color: rgba(167,139,250,.27); background: linear-gradient(130deg,rgba(63,42,107,.25),rgba(15,17,27,.92)); }
+.model-showcase-top { display:flex; justify-content: space-between; gap: 12px; align-items:center; flex-wrap:wrap; margin-bottom: 15px; }
+.model-state { display:inline-block; border-radius: 999px; padding: 7px 10px; font-size: 10px; font-weight: 750; color: #c1c6d3; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.09); }
+.model-state-ready { color: #c6b4ff; background: rgba(139,92,246,.13); border-color: rgba(139,92,246,.23); }
+.model-showcase-code { font: 700 12px "Manrope",sans-serif; color: #9e9eb2; }
+.model-showcase-card h3 { margin: 0 0 9px; font: 750 19px "Manrope",sans-serif; color: #f5f4fa; }
+.model-showcase-card > p { color: #acafc1; font-size: 12px; line-height: 1.68; margin: 0; }
+.model-showcase-card code { color: #e4d7ff; }
+.model-showcase-metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap: 10px; margin: 19px 0 16px; }
+.model-showcase-metrics div { border-radius: 12px; padding: 13px; border: 1px solid rgba(255,255,255,.07); background: rgba(0,0,0,.12); }
+.model-showcase-metrics strong { display: block; font: 800 23px "Manrope",sans-serif; color: #bca7ff; margin-bottom: 5px; }
+.model-showcase-metrics span { display:block; font-size: 10px; color: #999bb0; line-height:1.4; }
+.model-showcase-card .model-showcase-note { font-size: 11px; color: #898da0; }
+.model-showcase-footnote { padding: 13px 0 0; margin: 0; color: #9397a9; font-size: 11px; line-height: 1.6; }
+.model-showcase-footnote strong { color: #d0c9ee; }
+.serving-notice { margin: -6px 0 20px; padding: 12px 15px; background: rgba(139,92,246,.06); color: #c6bfdd; border: 1px solid rgba(139,92,246,.19); border-radius: 13px; font-size: 12px; line-height:1.55; }
+
+@media (max-width: 700px) {
+  .model-showcase-grid { grid-template-columns: 1fr; }
+  .model-showcase-card { padding: 18px; }
+  .model-showcase-metrics strong { font-size: 21px; }
+}
