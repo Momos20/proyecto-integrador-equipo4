@@ -38,7 +38,7 @@ docs/architecture/arquitectura_aws_cinegraph_kinesis.drawio
 
 Miguel entregó los archivos de `A0_base` y `A9_sin_id`, organizados en [`ml/models/`](ml/models/README.md). **A9 contiene un checkpoint `modelo.pt`** y métricas de validación registradas (Recall@20 0.138956; NDCG@20 0.091508 en el paso 1600). **A0 solo tiene su curva**. Se conservaron los archivos originales.
 
-La configuración de A9 señala `atributos_semanales=true` y aún debe comprobarse su compatibilidad con el protocolo diario de siete días. El checkpoint todavía no está conectado a un proceso de scoring, por lo que el Top-10 de demostración que devuelve PostgreSQL corresponde a `PopularityBaseline` (`baseline-v0`) y **no a GraphSAGE A9**.
+La configuración de A9 señala `atributos_semanales=true` y aún debe comprobarse su compatibilidad con el protocolo diario de siete días. El ZIP de Miguel `A9_topk_diario.zip` incorpora código de carga, inferencia, pruebas y validación diaria. La validación aportada se refiere a predicciones **del mismo día**, no al objetivo de **7 días** elegido para CineGraph. Véanse [revisión de la entrega](docs/revision-a9-miguel.md) e [importación aislada](docs/revision-a9-miguel.md#importación-segura-del-código). El checkpoint todavía no está conectado a un proceso de scoring, por lo que el Top-10 de demostración que devuelve PostgreSQL corresponde a `PopularityBaseline` (`baseline-v0`) y **no a GraphSAGE A9**.
 
 El workflow CI de GitHub Actions permanece disponible **solo mediante ejecución manual** desde «Run workflow»; un push o PR no lo dispara.
 
