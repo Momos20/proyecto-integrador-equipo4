@@ -51,16 +51,16 @@ function renderRecommendations(data){
     activeRecommendationContext={modelVersion:data.model?.version||null,cutoffDate:data.cutoff_date||data.cutoff_week||null};
     document.getElementById("resultCount").textContent=data.count;
     document.getElementById("resultUser").textContent=data.user_id;
-    document.getElementById("modelName").textContent=data.model?.name||"—";
-    document.getElementById("modelVersion").textContent=data.model?.version||"—";
-    document.getElementById("cutoffWeek").textContent=activeRecommendationContext.cutoffDate||"—";
     const currentModel=(data.model?.name||"").toLowerCase();
     const currentVersion=(data.model?.version||"").toLowerCase();
     const demoModel=currentVersion==="baseline-v0"||currentModel==="popularitybaseline";
+    document.getElementById("modelName").textContent=demoModel?"Datos de prueba":(data.model?.name||"—");
+    document.getElementById("modelVersion").textContent=demoModel?"Demostración":(data.model?.version||"—");
+    document.getElementById("cutoffWeek").textContent=activeRecommendationContext.cutoffDate||"—";
     servingNotice.hidden=false;
     servingNotice.textContent=demoModel
-        ?"Estás viendo un ranking de demostración de PopularityBaseline (baseline-v0). A9_sin_id todavía no está conectado a este Top-K."
-        :"Ranking generado con el modelo y la versión mostrados arriba. Los puntajes son scores de ranking, no necesariamente probabilidades.";
+        ?"Estas recomendaciones son datos de demostración y no fueron generadas por A9_sin_id. El modelo está seleccionado, pero su inferencia todavía no está integrada."
+        :"Ranking generado con el modelo indicado arriba. Los scores no representan necesariamente probabilidades calibradas.";
     movieGrid.innerHTML=data.recommendations.map(movie=>{
         const genres=(movie.genres||[]).slice(0,3).map(g=>`<span class="genre-chip">${escapeHtml(g)}</span>`).join("");
         const scoreValue=Number(movie.score);
