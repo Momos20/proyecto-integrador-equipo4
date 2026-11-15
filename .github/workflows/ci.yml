@@ -1,9 +1,9 @@
 name: CI
 
+# Ejecucion exclusivamente manual: no se inicia por push, PR ni cron.
+# La opcion "Run workflow" permanece en GitHub Actions.
 on:
-  pull_request:
-  push:
-    branches: [develop, main]
+  workflow_dispatch:
 
 jobs:
   test-app:
