@@ -53,3 +53,7 @@ El archivo `ratings_clean.parquet` permanece local; los Parquet se escriben en `
 - Pruebas `tests.test_evaluacion` y `tests.test_diario`: **pendientes** en este entorno porque falta `torch_geometric`.
 - Ejecución de Top-K sobre MovieLens 32M real: **pendiente** porque no se dispone del Parquet local de la Mac en este entorno; también falta `pyarrow`.
 - GitHub Actions: **no ejecutado**. No se modifican los workflows.
+
+## Ejecución con Floci en la etapa actual
+
+Primero probamos en local con Docker + Floci, **sin cuenta AWS**. El orquestador independiente [`scripts/ml/run_a9_floci.py`](../../scripts/ml/run_a9_floci.py) carga los ratings al S3 emulado, verifica checkpoint y Parquet, ejecuta las pruebas originales y el `src.recomendar` de Miguel, y guarda Top-K y manifiesto en S3 local. Guía: [`docs/a9-ejecucion-floci.md`](../../docs/a9-ejecucion-floci.md). Ni el checkpoint ni los archivos `src/` de Miguel se modifican.

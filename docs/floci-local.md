@@ -88,3 +88,11 @@ docker compose -f docker-compose.yml -f docker-compose.floci.yml --profile floci
 **Diferencia intencional respecto del despliegue real:** en AWS el diagrama utiliza un Kinesis Agent que sigue el log continuamente. Para este laboratorio, el agente se sustituye por un pequeño publicador **manual** compatible con el API de Kinesis de Floci. Esto evita exponer accidentalmente los eventos a AWS real. El `kinesis-agent` y su configuración productiva quedan intactos.
 
 La existencia del emulador o un evento nuevo **no ejecutan entrenamiento, scoring, Glue, Step Functions ni GitHub Actions**. Los workflows del repositorio siguen en `workflow_dispatch` (manual).
+
+## 6. MovieLens 32M y GraphSAGE A9 (laboratorio ML local separado)
+
+El mismo bucket emulado `cinegraph-local-datalake` puede almacenar el Parquet de MovieLens y las predicciones de A9. No hay que usar Amazon S3 real ni una consola AWS. Floci **solo simula S3**; las pruebas y la inferencia se ejecutan con PyTorch en la Mac, preservando el checkpoint y el código de Miguel. **No hay reentrenamiento**.
+
+Guía: [`docs/a9-ejecucion-floci.md`](a9-ejecucion-floci.md). Script: `scripts/ml/run_a9_floci.py`. Las salidas quedan bajo `predictions/a9/` en el S3 local, mientras que Kinesis/Firehose publica eventos bajo `raw/behavioral/cinegraph/live/`. Son dos circuitos diferentes; ninguno arranca automáticamente al hacer clic.
+
+No utilizar `scripts/ml/run_a9_s3.py`: era una preparación prematura para AWS real y fue retirada para evitar confusiones en esta fase.

@@ -42,3 +42,6 @@ dist/
 data/raw/
 data/processed/
 ml/a9_daily/data/
+
+# Entorno Python aislado para pruebas A9 (Floci local)
+.venv-a9/

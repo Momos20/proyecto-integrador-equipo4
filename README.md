@@ -11,6 +11,10 @@ La solución se diseña como una plataforma **MLOps end-to-end** con dos flujos 
 
 El diseño objetivo prevé **scoring diario**, con reentrenamiento periódico o condicionado; **ningún entrenamiento ni scoring de GraphSAGE se inicia por cada clic**. Por ahora, la aplicación consulta Top-K precalculado desde PostgreSQL.
 
+## Etapa actual: desarrollo con Floci local
+
+**Primero Floci + Docker en la Mac; AWS Academy después.** No se requiere cuenta, consola ni recursos AWS reales para las pruebas de esta fase. `docker-compose.floci.yml` emula S3, Kinesis y Firehose en `http://127.0.0.1:4566`. GraphSAGE A9 se ejecuta con Python/PyTorch local (Floci no ejecuta por sí mismo el modelo). El batch de A9 y el flujo Kinesis/Firehose son pruebas manuales independientes. [Guía para A9 + Floci](docs/a9-ejecucion-floci.md).
+
 ## Arquitectura objetivo
 
 - **Fuentes históricas:** MovieLens 32M y metadatos de TMDB.
@@ -44,7 +48,7 @@ La [guía de datos para A9](data/reference/movielens32m/README.md) incluye el co
 
 Miguel entregó los archivos de `A0_base` y `A9_sin_id`, organizados en [`ml/models/`](ml/models/README.md). **A9 contiene un checkpoint `modelo.pt`** y métricas de validación registradas (Recall@20 0.138956; NDCG@20 0.091508 en el paso 1600). **A0 solo tiene su curva**. Se conservaron los archivos originales.
 
-La configuración de A9 señala `atributos_semanales=true` y aún debe comprobarse su compatibilidad con el protocolo diario de siete días. El ZIP de Miguel `A9_topk_diario.zip` incorpora código de carga, inferencia, pruebas y validación diaria. La validación aportada se refiere a predicciones **del mismo día**, no al objetivo de **7 días** elegido para CineGraph. Véanse [revisión de la entrega](docs/revision-a9-miguel.md) e [importación aislada](docs/revision-a9-miguel.md#importación-segura-del-código). El checkpoint todavía no está conectado a un proceso de scoring, por lo que el Top-10 de demostración que devuelve PostgreSQL corresponde a `PopularityBaseline` (`baseline-v0`) y **no a GraphSAGE A9**.
+La configuración de A9 señala `atributos_semanales=true` y aún debe comprobarse su compatibilidad con el protocolo diario de siete días. La implementación de Miguel `A9_topk_diario` ya está incorporada en [`ml/a9_daily/`](ml/a9_daily/), con el código de carga, inferencia, pruebas y validación diaria, sin modificar GraphSAGE. El orquestador nuevo está en `scripts/ml/run_a9_floci.py` y se ejecuta solo de forma manual. La validación aportada se refiere a predicciones **del mismo día**, no al objetivo de **7 días** elegido para CineGraph. Véanse [revisión de la entrega](docs/revision-a9-miguel.md) e [importación aislada](docs/revision-a9-miguel.md#importación-segura-del-código). El checkpoint todavía no está conectado a un proceso de scoring ejecutado y validado en nuestro entorno, por lo que el Top-10 de demostración que devuelve PostgreSQL corresponde a `PopularityBaseline` (`baseline-v0`) y **no a GraphSAGE A9**.
 
 El workflow CI de GitHub Actions permanece disponible **solo mediante ejecución manual** desde «Run workflow»; un push o PR no lo dispara.
 
@@ -134,7 +138,23 @@ docker compose -f docker-compose.yml -f docker-compose.floci.yml --profile floci
 docker compose -f docker-compose.yml -f docker-compose.floci.yml --profile floci run --rm floci-tools verify
 ```
 
-El publicador de laboratorio es **manual**; el Kinesis Agent de EC2 no se modifica. Glue/SageMaker scoring diario siguen pendientes de implementación y datos de Miguel.
+El publicador de laboratorio es **manual**; el Kinesis Agent de EC2 no se modifica. Glue/SageMaker reales son objetivos posteriores, no servicios utilizados ahora.
+
+### Prueba local de A9 con MovieLens 32M
+
+La aplicación y el almacenamiento/streaming emulados se ejecutan en Docker/Floci; la inferencia de Miguel se ejecuta con PyTorch local, manteniendo sus pesos y protocolo diario. Una vez arrancado Floci y su bucket emulado, con las dependencias instaladas:
+
+```bash
+python scripts/ml/run_a9_floci.py \
+  --ratings-local "$HOME/Downloads/ml-32m/ml32m_cache/ratings_clean.parquet" \
+  --solo-subir
+# Después, para ejecutar pruebas originales e inferencia real:
+python scripts/ml/run_a9_floci.py \
+  --ratings-local "$HOME/Downloads/ml-32m/ml32m_cache/ratings_clean.parquet" \
+  --fecha 2023-06-15 --usuarios 123 456 --k 10
+```
+
+Detalles y requisitos: [`docs/a9-ejecucion-floci.md`](docs/a9-ejecucion-floci.md). Los ratings y resultados Top-K se almacenan en **S3 local de Floci**, no en GitHub ni en AWS real. Las recomendaciones aún no alimentan PostgreSQL; la conexión A9 → app es una fase posterior.
 
 ## Streaming en AWS
 
@@ -200,15 +220,11 @@ flask --app app.main run --debug
 
 ## Ramas
 
-- `main`: versión estable y demostrable.
-- `develop`: integración del equipo.
-- `feature/*`: trabajo por funcionalidad.
-
-Los cambios relevantes deben llegar a `main` mediante Pull Request.
+Actualmente solo se mantiene `main` en el repositorio remoto, por decisión del equipo. No se crean ramas adicionales ni ejecuciones automáticas para el laboratorio local.
 
 ## Estado del proyecto
 
-MVP Flask + PostgreSQL con feedback operacional funcional. El backend produce clickstream JSONL y el repositorio incluye configuración de Kinesis Agent. Se recibieron los modelos de Miguel y se organizaron en `ml/models/`; el checkpoint A9 aún necesita su código de inferencia y el proceso de generación de Top-K antes de sustituir el seed de demostración. El despliegue de recursos AWS y el pipeline `Raw → Curated → Features → scoring diario` siguen pendientes.
+MVP Flask + PostgreSQL con feedback operacional funcional. El backend produce clickstream JSONL y el repositorio incluye configuración de Kinesis Agent. Se recibieron los modelos de Miguel; A9 ya tiene su código original en `ml/a9_daily/` y checkpoint en `ml/models/`. La ejecución real de sus pruebas, la inferencia Top-K sobre MovieLens 32M y su publicación en PostgreSQL **aún no han sido verificadas**. El laboratorio Floci es la fase actual; el despliegue en AWS Academy y el pipeline `Raw → Curated → Features → scoring diario` quedan para después.
 
 ## Equipo 4
 
