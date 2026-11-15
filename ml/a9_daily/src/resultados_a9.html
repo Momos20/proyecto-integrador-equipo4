@@ -1,0 +1,393 @@
+<style>
+html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); }
+.r9 { display: grid; gap: var(--cds-gap-xl); max-width: 72rem; margin: 0 auto; padding: 32px 16px 48px; font-family: var(--font-anthropic-sans); font-size: var(--cds-font-size-body); }
+.r9 h1, .r9 h2, .r9 h3, .r9 p, .r9 ol { margin: 0; }
+.r9 header, .r9 section { display: grid; gap: var(--cds-gap-md); }
+.r9 h1 { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: calc(var(--cds-font-size-title) * 1.3); line-height: 1.15; }
+.r9 h2 { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); }
+.r9 h3 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); }
+.r9-tesis { color: var(--color-fg-muted); max-width: 72ch; line-height: 1.5; }
+.r9-tesis b { color: var(--color-fg); font-variant-numeric: tabular-nums; }
+.r9-nota { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); line-height: 1.45; max-width: 80ch; }
+.r9-grid { display: grid; gap: var(--cds-gap-md); grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); }
+.r9-card { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); display: grid; gap: var(--cds-gap-sm); align-content: start; min-width: 0; }
+.r9-controles { display: flex; flex-wrap: wrap; gap: var(--cds-gap-sm) var(--cds-gap-lg); align-items: center; }
+.r9-control { display: flex; flex-wrap: wrap; gap: var(--cds-gap-xs); align-items: center; }
+.r9-control > span { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); margin-right: 2px; }
+.r9-control button { font: inherit; font-size: var(--cds-font-size-caption); color: var(--color-fg); background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: 999px; padding: var(--cds-pad-xs) var(--cds-pad-sm); cursor: pointer; white-space: nowrap; }
+.r9-control button:hover { border-color: var(--color-fg-muted); }
+.r9-control button[aria-pressed="true"] { background: var(--color-fg); color: var(--color-bg); border-color: var(--color-fg); }
+.r9 button:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 2px; }
+.r9-cifras { display: flex; flex-wrap: wrap; gap: var(--cds-gap-md) var(--cds-gap-lg); }
+.r9-cifras > div { display: grid; gap: 2px; }
+.r9-cifras b { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: calc(var(--cds-font-size-heading) * 1.35); font-variant-numeric: tabular-nums; }
+.r9-cifras span { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.r9-tabla { overflow-x: auto; min-width: 0; }
+.r9-tabla table { border-collapse: collapse; width: 100%; font-size: var(--cds-font-size-caption); font-variant-numeric: tabular-nums; }
+.r9-tabla th { text-align: left; font-weight: var(--cds-font-weight-medium); color: var(--color-fg-muted); border-bottom: 1px solid var(--color-border-line); padding: var(--cds-pad-xs) var(--cds-pad-sm); }
+.r9-tabla td { border-bottom: 1px solid var(--color-border-line); padding: var(--cds-pad-xs) var(--cds-pad-sm); vertical-align: top; line-height: 1.4; }
+.r9-tabla tr:last-child td { border-bottom: 0; }
+.r9-tabla .n { text-align: right; white-space: nowrap; }
+.r9-tabla .g { color: var(--color-fg-muted); }
+.r9-tabla tr.acierto td { background: color-mix(in srgb, var(--color-ok) 10%, transparent); }
+.r9-ok { color: var(--color-ok); font-weight: 600; white-space: nowrap; }
+.r9-leyenda { display: flex; flex-wrap: wrap; gap: var(--cds-gap-xs) var(--cds-gap-md); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.r9-leyenda .it { display: inline-flex; align-items: center; gap: 6px; }
+.r9-sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+.r9-sw.linea { width: 16px; height: 0; border-radius: 0; border-top: 2px solid; }
+.r9-sw.linea.discontinua { border-top-style: dashed; }
+.r9-chart { position: relative; min-width: 0; min-height: 240px; }
+.r9-chart svg { display: block; overflow: visible; }
+#g-comp-recall, #g-comp-ndcg, #g-generos { min-height: 0; }
+.r9-eje text, .r9-txt { font-family: var(--font-anthropic-sans); font-size: var(--cds-font-size-caption); fill: var(--color-fg-muted); }
+.r9-eje path, .r9-eje line { stroke: var(--cds-chart-axis); }
+.r9-rejilla line { stroke: var(--cds-chart-grid); }
+.r9-rejilla path { display: none; }
+.r9-tip { position: absolute; top: 4px; left: 0; z-index: 2; pointer-events: none; display: grid; gap: 2px; min-width: 10rem; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); border-radius: var(--cds-radius); box-shadow: var(--cds-shadow-popover); padding: var(--cds-pad-xs) var(--cds-pad-sm); font-size: var(--cds-font-size-caption); }
+.r9-tip[hidden] { display: none; }
+.r9-tip .t { color: var(--cds-text-secondary); }
+.r9-tip .f { display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.r9-tip .f b { margin-left: auto; padding-left: var(--cds-pad-sm); font-weight: 600; }
+.r9-tip .s { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.r9-pie { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); line-height: 1.5; }
+</style>
+
+<main class="r9">
+  <header>
+    <h1>GraphSAGE A9: recomendaciones y resultados</h1>
+    <p class="r9-tesis" id="tesis"></p>
+  </header>
+
+  <section>
+    <h2>Recomendaciones de ejemplo</h2>
+    <p class="r9-nota">Tres usuarios que calificaron películas en las tres semanas, con historial corto, medio y largo (percentiles 10, 50 y 90 entre ellos).
+      Para cada semana, A9 sólo ve los ratings anteriores a ella y sólo recomienda películas ya conocidas que el usuario no ha calificado.
+      En verde, las recomendaciones que el usuario calificó esa semana.</p>
+    <div class="r9-controles">
+      <div class="r9-control" id="c-usuario"><span>Usuario</span></div>
+      <div class="r9-control" id="c-semana"><span>Semana</span></div>
+    </div>
+    <div class="r9-cifras" id="cifras"></div>
+    <div class="r9-grid">
+      <div class="r9-card">
+        <h3>Top 10 de A9</h3>
+        <div class="r9-tabla"><table id="t-top"></table></div>
+      </div>
+      <div class="r9-card">
+        <h3>Lo que calificó esa semana</h3>
+        <p class="r9-nota">Con la posición que le daba A9 entre todas las películas candidatas.</p>
+        <div class="r9-tabla"><table id="t-vistas"></table></div>
+      </div>
+    </div>
+    <div class="r9-card">
+      <h3>Géneros: historial frente a recomendaciones</h3>
+      <p class="r9-nota">Fracción de películas de cada género en el historial del usuario y en su top 20 de esa semana (una película cuenta en todos sus géneros). Los 10 géneros con más peso.</p>
+      <div class="r9-leyenda" id="l-generos"></div>
+      <div class="r9-chart" id="g-generos"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Resultados en test (40 semanas de 2023)</h2>
+    <div class="r9-grid">
+      <div class="r9-card"><h3>Recall@20 promedio</h3><div class="r9-chart" id="g-comp-recall"></div></div>
+      <div class="r9-card"><h3>NDCG@20 promedio</h3><div class="r9-chart" id="g-comp-ndcg"></div></div>
+    </div>
+    <div class="r9-card">
+      <h3>Tabla</h3>
+      <div class="r9-tabla"><table id="t-comp"></table></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Métricas por semana</h2>
+    <div class="r9-controles"><div class="r9-control" id="c-metrica"><span>Métrica</span></div></div>
+    <div class="r9-card">
+      <div class="r9-leyenda" id="l-semanal"></div>
+      <div class="r9-chart" id="g-semanal" style="min-height: 280px"></div>
+      <p class="r9-nota">Validación (2022) con los pesos de la parada temprana; test (2023) con el modelo reentrenado hasta dic-2022 y los pesos fijos todo el año.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Validación externa con Wikipedia</h2>
+    <p class="r9-nota" id="nota-wiki"></p>
+    <div class="r9-cifras" id="cifras-wiki"></div>
+    <div class="r9-card">
+      <h3>¿MovieLens refleja la popularidad real?</h3>
+      <p class="r9-nota">Correlación de Spearman, cada semana, entre los ratings de cada película en MovieLens y sus visitas en Wikipedia esa misma semana.</p>
+      <div class="r9-chart" id="g-wiki-spearman"></div>
+    </div>
+    <div class="r9-card">
+      <h3>¿A9 recomienda lo que está en boga?</h3>
+      <p class="r9-nota" id="nota-wiki-coincidencia"></p>
+      <div class="r9-leyenda" id="l-wiki-coincidencia"></div>
+      <div class="r9-chart" id="g-wiki-coincidencia" style="min-height: 280px"></div>
+    </div>
+    <div class="r9-card">
+      <h3>Ejemplos: las películas con más visitas en 2023</h3>
+      <p class="r9-nota">Ratings por semana en MovieLens y visitas por semana en Wikipedia, cada serie dividida por su propio máximo para verlas en la misma escala.</p>
+      <div class="r9-controles"><div class="r9-control" id="c-wiki-pelicula"><span>Película</span></div></div>
+      <div class="r9-leyenda" id="l-wiki-ejemplo"></div>
+      <div class="r9-chart" id="g-wiki-ejemplo"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Curva de entrenamiento</h2>
+    <p class="r9-nota" id="nota-curva"></p>
+    <div class="r9-grid">
+      <div class="r9-card"><h3>Pérdida BPR</h3><div class="r9-chart" id="g-perdida"></div></div>
+      <div class="r9-card">
+        <h3>Recall@20 y NDCG@20 en validación</h3>
+        <div class="r9-leyenda" id="l-curva"></div>
+        <div class="r9-chart" id="g-curva"></div>
+      </div>
+    </div>
+  </section>
+
+  <p class="r9-pie" id="pie"></p>
+</main>
+
+<script>
+(() => {
+  const D = window.DATOS_A9;
+  d3.timeFormatDefaultLocale({
+    dateTime: '%A, %e de %B de %Y, %X', date: '%d/%m/%Y', time: '%H:%M:%S', periods: ['AM', 'PM'],
+    days: ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'],
+    shortDays: ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'],
+    months: ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'],
+    shortMonths: ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'],
+  });
+  const C1 = 'var(--serie-1)', C2 = 'var(--serie-2)', GRIS = 'var(--cds-chart-muted)';
+  const f3 = d3.format('.3f');
+  const fPct = d3.format('.0%');
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const grupoTexto = { corto: 'historial corto', medio: 'historial medio', largo: 'historial largo' };
+  const dibujos = [];
+  const dibujar = (fn) => { dibujos.push(fn); fn(); };
+  let espera;
+  window.addEventListener('resize', () => { clearTimeout(espera); espera = setTimeout(() => dibujos.forEach((fn) => fn()), 150); });
+
+  // ---------- utilidades ----------
+  function botones(id, opciones, actual, alCambiar) {
+    const cont = d3.select(id);
+    const b = cont.selectAll('button').data(opciones).join('button')
+      .attr('type', 'button').text((o) => o.texto)
+      .attr('aria-pressed', (o) => o.valor === actual)
+      .on('click', (_, o) => { b.attr('aria-pressed', (x) => x.valor === o.valor); alCambiar(o.valor); });
+  }
+  function leyenda(id, items) {
+    d3.select(id).html(items.map((i) => `<span class="it"><span class="r9-sw ${i.linea ? 'linea' : ''} ${i.discontinua ? 'discontinua' : ''}" style="${i.linea ? 'border-color' : 'background'}:${i.color}"></span>${esc(i.texto)}</span>`).join(''));
+  }
+  function lienzo(id, alto, margen) {
+    const cont = d3.select(id);
+    cont.selectAll('*').remove();
+    const ancho = cont.node().clientWidth;
+    const svg = cont.append('svg').attr('width', ancho).attr('height', alto);
+    const tip = cont.append('div').attr('class', 'r9-tip').attr('hidden', true);
+    return { svg, tip, ancho, alto, x0: margen.izq, x1: ancho - margen.der, y0: alto - margen.abajo, y1: margen.arriba };
+  }
+  function mostrarTip(l, html, x) {
+    l.tip.html(html).attr('hidden', null);
+    const w = l.tip.node().offsetWidth;
+    l.tip.style('left', `${Math.max(0, Math.min(l.ancho - w, x + 12))}px`);
+  }
+  const filaTip = (color, texto, valor) => `<div class="f"><span class="s" style="background:${color}"></span>${esc(texto)}<b>${valor}</b></div>`;
+
+  function lineas(id, { series, x, formatoX, formatoTip = formatoX, formatoY, alto = 240, referencia, divisor }) {
+    const l = lienzo(id, alto, { izq: 44, der: 12, arriba: 12, abajo: 26 });
+    const todos = series.flatMap((s) => s.puntos);
+    const ex = (x.tipo === 'tiempo' ? d3.scaleUtc() : d3.scaleLinear()).domain(d3.extent(todos, (p) => p.x)).range([l.x0, l.x1]);
+    const [mn, mx] = d3.extent(todos, (p) => p.y);
+    const ey = d3.scaleLinear().domain([mn - (mx - mn) * 0.08, mx + (mx - mn) * 0.08]).nice().range([l.y0, l.y1]);
+    l.svg.append('g').attr('class', 'r9-rejilla').attr('transform', `translate(${l.x0},0)`).call(d3.axisLeft(ey).ticks(5).tickSize(-(l.x1 - l.x0)).tickFormat(''));
+    l.svg.append('g').attr('class', 'r9-eje').attr('transform', `translate(${l.x0},0)`).call(d3.axisLeft(ey).ticks(5).tickFormat(formatoY).tickSizeOuter(0));
+    l.svg.append('g').attr('class', 'r9-eje').attr('transform', `translate(0,${l.y0})`).call(d3.axisBottom(ex).ticks(Math.max(2, Math.floor((l.x1 - l.x0) / 90))).tickFormat(formatoX).tickSizeOuter(0));
+    if (divisor) {
+      const xd = ex(divisor.x);
+      l.svg.append('line').attr('x1', xd).attr('x2', xd).attr('y1', l.y1).attr('y2', l.y0).attr('stroke', 'var(--cds-chart-reference)').attr('stroke-dasharray', '3 3');
+      l.svg.append('text').attr('class', 'r9-txt').attr('x', xd - 6).attr('y', l.y1 + 10).attr('text-anchor', 'end').text(divisor.antes);
+      l.svg.append('text').attr('class', 'r9-txt').attr('x', xd + 6).attr('y', l.y1 + 10).text(divisor.despues);
+    }
+    if (referencia) {
+      const xr = ex(referencia.x);
+      l.svg.append('line').attr('x1', xr).attr('x2', xr).attr('y1', l.y1).attr('y2', l.y0).attr('stroke', 'var(--cds-chart-reference)').attr('stroke-dasharray', '3 3');
+      const alFinal = xr > l.x1 - 110;  // si no cabe a la derecha, el texto va a la izquierda de la línea
+      l.svg.append('text').attr('class', 'r9-txt').attr('x', alFinal ? xr - 6 : xr + 6).attr('y', l.y1 + 10).attr('text-anchor', alFinal ? 'end' : 'start').text(referencia.texto);
+    }
+    const linea = d3.line().x((p) => ex(p.x)).y((p) => ey(p.y));
+    series.forEach((s) => l.svg.append('path').attr('d', linea(s.puntos)).attr('fill', 'none').attr('stroke', s.color).attr('stroke-width', 2)
+      .attr('stroke-dasharray', s.discontinua ? '5 3' : null).attr('stroke-linejoin', 'round'));
+    // capa de hover: cruz vertical + puntos + tooltip con todas las series en esa x
+    const cruz = l.svg.append('line').attr('y1', l.y1).attr('y2', l.y0).attr('stroke', 'var(--cds-chart-axis)').attr('visibility', 'hidden');
+    const marcas = l.svg.selectAll('circle.m').data(series).join('circle').attr('class', 'm').attr('r', 4).attr('fill', (s) => s.color)
+      .attr('stroke', 'var(--color-panel)').attr('stroke-width', 2).attr('visibility', 'hidden');
+    const xs = [...new Set(todos.map((p) => +p.x))].sort((a, b) => a - b);
+    l.svg.append('rect').attr('x', l.x0).attr('y', l.y1).attr('width', l.x1 - l.x0).attr('height', l.y0 - l.y1).attr('fill', 'transparent')
+      .on('pointermove', (ev) => {
+        const xv = ex.invert(d3.pointer(ev)[0]);
+        const cerca = xs[d3.minIndex(xs, (v) => Math.abs(v - xv))];
+        const px = ex(cerca);
+        cruz.attr('x1', px).attr('x2', px).attr('visibility', 'visible');
+        const filas = series.map((s) => ({ s, p: s.puntos.find((p) => +p.x === cerca) }));
+        marcas.attr('visibility', (s) => (filas.find((f) => f.s === s).p ? 'visible' : 'hidden'))
+          .attr('cx', px).attr('cy', (s) => { const p = filas.find((f) => f.s === s).p; return p ? ey(p.y) : 0; });
+        mostrarTip(l, `<div class="t">${esc(formatoTip(x.tipo === 'tiempo' ? new Date(cerca) : cerca))}</div>` +
+          filas.filter((f) => f.p).map((f) => filaTip(f.s.color, f.s.nombre, formatoY(f.p.y))).join(''), px);
+      })
+      .on('pointerleave', () => { cruz.attr('visibility', 'hidden'); marcas.attr('visibility', 'hidden'); l.tip.attr('hidden', true); });
+  }
+
+  function barrasH(id, filas, { formato, alto }) {
+    // filas: [{etiqueta, valores: [{nombre, valor, color}]}]
+    const n = filas[0].valores.length;
+    const altoGrupo = n === 1 ? 26 : 34;
+    const izq = Math.min(190, d3.max(filas, (f) => f.etiqueta.length) * 7.2 + 12, d3.select(id).node().clientWidth * 0.45);
+    const l = lienzo(id, alto || filas.length * altoGrupo + 30, { izq, der: 44, arriba: 4, abajo: 24 });
+    const ex = d3.scaleLinear().domain([0, d3.max(filas, (f) => d3.max(f.valores, (v) => v.valor))]).nice().range([l.x0, l.x1]);
+    const ey = d3.scaleBand().domain(filas.map((f) => f.etiqueta)).range([l.y1, l.y0]).paddingInner(0.25);
+    const ticks = Math.max(2, Math.min(5, Math.floor((l.x1 - l.x0) / 55)));
+    const sub = d3.scaleBand().domain(d3.range(n)).range([0, ey.bandwidth()]).paddingInner(n > 1 ? 0.15 : 0);
+    l.svg.append('g').attr('class', 'r9-rejilla').attr('transform', `translate(0,${l.y0})`).call(d3.axisBottom(ex).ticks(ticks).tickSize(-(l.y0 - l.y1)).tickFormat(''));
+    l.svg.append('g').attr('class', 'r9-eje').attr('transform', `translate(0,${l.y0})`).call(d3.axisBottom(ex).ticks(ticks).tickFormat(formato).tickSizeOuter(0));
+    const ejeY = l.svg.append('g').attr('class', 'r9-eje').attr('transform', `translate(${l.x0},0)`).call(d3.axisLeft(ey).tickSize(0).tickPadding(8));
+    ejeY.select('.domain').remove();
+    ejeY.selectAll('text').each(function (etiqueta) {  // en pantallas angostas se recorta; el tooltip la muestra completa
+      const t = d3.select(this);
+      let texto = etiqueta;
+      while (this.getComputedTextLength() > l.x0 - 10 && texto.length > 4) { texto = texto.slice(0, -1); t.text(texto.trimEnd() + '…'); }
+    });
+    const g = l.svg.selectAll('g.f').data(filas).join('g').attr('class', 'f').attr('transform', (f) => `translate(0,${ey(f.etiqueta)})`);
+    g.selectAll('path').data((f) => f.valores.map((v, i) => ({ ...v, i }))).join('path')
+      .attr('fill', (v) => v.color)
+      .attr('d', (v) => {  // barra con el extremo de datos redondeado (4 px), anclada al eje
+        const x = l.x0, w = Math.max(0, ex(v.valor) - l.x0), y = sub(v.i), h = sub.bandwidth(), r = Math.min(4, w, h / 2);
+        return `M${x},${y}h${w - r}a${r},${r} 0 0 1 ${r},${r}v${h - 2 * r}a${r},${r} 0 0 1 ${-r},${r}h${-(w - r)}Z`;
+      });
+    if (n === 1) {
+      g.append('text').attr('class', 'r9-txt').attr('x', (f) => ex(f.valores[0].valor) + 6).attr('y', ey.bandwidth() / 2).attr('dy', '0.35em').text((f) => formato(f.valores[0].valor));
+    }
+    g.append('rect').attr('x', 0).attr('width', l.ancho).attr('y', -ey.step() * 0.125).attr('height', ey.step()).attr('fill', 'transparent')
+      .on('pointermove', (ev, f) => mostrarTip(l, `<div class="t">${esc(f.etiqueta)}</div>` + f.valores.map((v) => filaTip(v.color, v.nombre, formato(v.valor))).join(''), d3.pointer(ev, l.svg.node())[0]))
+      .on('pointerleave', () => l.tip.attr('hidden', true));
+  }
+
+  // ---------- encabezado ----------
+  const comp = D.comparacion;
+  const a9 = comp.find((c) => c.metodo === D.modelo), base = comp.find((c) => c.metodo === D.linea_base);
+  d3.select('#tesis').html(`En las 40 semanas de test de 2023, ${esc(D.modelo)} logra un Recall@20 de <b>${f3(a9['recall@20'])}</b> frente a <b>${f3(base['recall@20'])}</b> de la ${esc(D.linea_base.toLowerCase())}, y un NDCG@20 de <b>${f3(a9['ndcg@20'])}</b> frente a <b>${f3(base['ndcg@20'])}</b>. Abajo, ejemplos de lo que recomienda a usuarios concretos en tres semanas de 2023.`);
+
+  // ---------- recomendaciones ----------
+  const usuarios = [...new Map(D.recomendaciones.map((r) => [r.usuario, r.grupo])).entries()];
+  const semanas = [...new Set(D.recomendaciones.map((r) => r.semana))];
+  const estado = { usuario: usuarios[0][0], semana: semanas[0] };
+  const fechaLarga = (s) => d3.utcFormat('%d %b %Y')(new Date(s + 'T00:00:00Z'));
+
+  function pintarRecomendaciones() {
+    const r = D.recomendaciones.find((x) => x.usuario === estado.usuario && x.semana === estado.semana);
+    const aciertos10 = r.recomendadas.filter((x) => x.acierto).length;
+    const enTop20 = r.vistas.filter((v) => v.posicion <= 20).length;
+    d3.select('#cifras').html([
+      [r.n_historial.toLocaleString('es'), 'ratings antes de la semana'],
+      [r.vistas.length, 'películas calificadas esa semana'],
+      [aciertos10, 'aciertos en el top 10'],
+      [enTop20, 'aciertos en el top 20'],
+    ].map(([v, t]) => `<div><b>${v}</b><span>${t}</span></div>`).join(''));
+    d3.select('#t-top').html('<thead><tr><th class="n">#</th><th>Película</th><th>Géneros</th><th></th></tr></thead><tbody>' +
+      r.recomendadas.map((x) => `<tr class="${x.acierto ? 'acierto' : ''}"><td class="n">${x.posicion}</td><td>${esc(x.titulo)}</td><td class="g">${esc(x.generos)}</td><td>${x.acierto ? '<span class="r9-ok">✓ la vio</span>' : ''}</td></tr>`).join('') + '</tbody>');
+    d3.select('#t-vistas').html(r.vistas.length
+      ? '<thead><tr><th>Película</th><th>Géneros</th><th class="n">Posición en A9</th></tr></thead><tbody>' +
+        r.vistas.map((v) => `<tr class="${v.posicion <= 10 ? 'acierto' : ''}"><td>${esc(v.titulo)}</td><td class="g">${esc(v.generos)}</td><td class="n">${v.posicion.toLocaleString('es')}</td></tr>`).join('') + '</tbody>'
+      : '<tbody><tr><td>Ninguna película candidata.</td></tr></tbody>');
+
+    const generos = D.generos.filter((g) => g.usuario === estado.usuario && g.semana === estado.semana)
+      .sort((a, b) => d3.max([b.historial, b.recomendado]) - d3.max([a.historial, a.recomendado])).slice(0, 10);
+    barrasH('#g-generos', generos.map((g) => ({ etiqueta: g.genero, valores: [
+      { nombre: 'Historial', valor: g.historial, color: C2 },
+      { nombre: 'Top 20 de A9', valor: g.recomendado, color: C1 },
+    ] })), { formato: fPct });
+  }
+  botones('#c-usuario', usuarios.map(([u, g]) => ({ valor: u, texto: `${u} · ${grupoTexto[g]}` })), estado.usuario, (v) => { estado.usuario = v; pintarRecomendaciones(); });
+  botones('#c-semana', semanas.map((s) => ({ valor: s, texto: fechaLarga(s) })), estado.semana, (v) => { estado.semana = v; pintarRecomendaciones(); });
+  leyenda('#l-generos', [{ texto: 'Historial', color: C2 }, { texto: 'Top 20 de A9', color: C1 }]);
+  dibujar(pintarRecomendaciones);
+
+  // ---------- comparación en test ----------
+  const orden = [...comp].sort((a, b) => b['recall@20'] - a['recall@20']);
+  const barrasComp = (metrica) => orden.map((c) => ({ etiqueta: c.metodo, valores: [{ nombre: metrica === 'recall@20' ? 'Recall@20' : 'NDCG@20', valor: c[metrica], color: c.metodo === D.modelo ? C1 : GRIS }] }));
+  dibujar(() => barrasH('#g-comp-recall', barrasComp('recall@20'), { formato: f3 }));
+  dibujar(() => barrasH('#g-comp-ndcg', [...barrasComp('ndcg@20')].sort((a, b) => b.valores[0].valor - a.valores[0].valor), { formato: f3 }));
+  d3.select('#t-comp').html('<thead><tr><th>Método</th><th class="n">Recall@20</th><th class="n">NDCG@20</th><th class="n">HitRate@20</th><th class="n">MRR</th></tr></thead><tbody>' +
+    orden.map((c) => `<tr><td>${c.metodo === D.modelo ? `<b>${esc(c.metodo)}</b>` : esc(c.metodo)}</td>${['recall@20', 'ndcg@20', 'hitrate@20', 'mrr'].map((m) => `<td class="n">${c[m] < 0.001 ? c[m].toExponential(1) : f3(c[m])}</td>`).join('')}</tr>`).join('') + '</tbody>');
+
+  // ---------- métricas por semana ----------
+  const fechaUtc = (s) => new Date(s + 'T00:00:00Z');
+  let metrica = 'recall@20';
+  const inicioTest = d3.min(D.semanal.filter((s) => s.particion === 'test'), (s) => fechaUtc(s.fecha));
+  const pintarSemanal = () => lineas('#g-semanal', {
+    alto: 280, x: { tipo: 'tiempo' }, formatoX: d3.utcFormat('%b %Y'), formatoTip: d3.utcFormat('Semana del %d %b %Y'), formatoY: f3,
+    divisor: { x: inicioTest, antes: 'Validación 2022', despues: 'Test 2023' },
+    series: [[D.modelo, C1], [D.linea_base, C2]].map(([nombre, color]) => ({
+      nombre, color, puntos: D.semanal.filter((s) => s.metodo === nombre).map((s) => ({ x: fechaUtc(s.fecha), y: s[metrica] })).sort((a, b) => a.x - b.x),
+    })),
+  });
+  botones('#c-metrica', [{ valor: 'recall@20', texto: 'Recall@20' }, { valor: 'ndcg@20', texto: 'NDCG@20' }], metrica, (v) => { metrica = v; pintarSemanal(); });
+  leyenda('#l-semanal', [{ texto: D.modelo, color: C1, linea: true }, { texto: D.linea_base, color: C2, linea: true }]);
+  dibujar(pintarSemanal);
+
+  // ---------- validación externa con Wikipedia ----------
+  const W = D.wikipedia;
+  const REF = 'var(--cds-chart-reference)';
+  const cob = W.cobertura;
+  d3.select('#nota-wiki').text(`Las visitas semanales al artículo de cada película en Wikipedia en inglés son una medida externa de popularidad; MovieLens sólo registra ratings. Se usan sólo para evaluar: no entran al modelo. De las ${cob.peliculas_evaluadas.toLocaleString('es')} películas con algún rating en 2022–2023, ${cob.con_articulo.toLocaleString('es')} tienen artículo (buscado en Wikidata por su IMDb) y ${cob.con_visitas.toLocaleString('es')} tienen visitas registradas.`);
+  d3.select('#nota-wiki-coincidencia').text(`Cada semana, de las ${cob.k} películas candidatas con más visitas en Wikipedia, qué fracción está entre las ${cob.k} a las que A9 más expone (usuarios que regresan esa semana con la película en su top ${cob.k_usuario}). Se compara con las ${cob.k} con más ratings la semana anterior en MovieLens (la línea base) y con las ${cob.k} con más visitas la semana anterior (referencia: qué tanto se repite Wikipedia de una semana a otra).`);
+  const promedio = (part, col) => d3.mean(W.semanal.filter((s) => s.particion === part), (s) => s[col]);
+  d3.select('#cifras-wiki').html([
+    [f3(promedio('test', 'spearman_ratings_visitas')), 'Spearman medio en test'],
+    [fPct(promedio('test', 'coincidencia_a9')), `coincidencia@${cob.k} de A9 en test`],
+    [fPct(promedio('test', 'coincidencia_popularidad_anterior')), `coincidencia@${cob.k} de la popularidad anterior`],
+    [fPct(promedio('test', 'coincidencia_wikipedia_anterior')), `coincidencia@${cob.k} de Wikipedia anterior`],
+  ].map(([v, t]) => `<div><b>${v}</b><span>${t}</span></div>`).join(''));
+  const inicioTestWiki = d3.min(W.semanal.filter((s) => s.particion === 'test'), (s) => fechaUtc(s.fecha));
+  const serieWiki = (col) => W.semanal.map((s) => ({ x: fechaUtc(s.fecha), y: s[col] })).sort((a, b) => a.x - b.x);
+  const comunWiki = { x: { tipo: 'tiempo' }, formatoX: d3.utcFormat('%b %Y'), formatoTip: d3.utcFormat('Semana del %d %b %Y'),
+    divisor: { x: inicioTestWiki, antes: 'Validación 2022', despues: 'Test 2023' } };
+  dibujar(() => lineas('#g-wiki-spearman', { ...comunWiki, formatoY: f3,
+    series: [{ nombre: 'Spearman', color: C1, puntos: serieWiki('spearman_ratings_visitas') }] }));
+  dibujar(() => lineas('#g-wiki-coincidencia', { ...comunWiki, alto: 280, formatoY: fPct, series: [
+    { nombre: D.modelo, color: C1, puntos: serieWiki('coincidencia_a9') },
+    { nombre: 'Popularidad semana anterior (MovieLens)', color: C2, puntos: serieWiki('coincidencia_popularidad_anterior') },
+    { nombre: 'Wikipedia semana anterior (referencia)', color: REF, discontinua: true, puntos: serieWiki('coincidencia_wikipedia_anterior') },
+  ] }));
+  leyenda('#l-wiki-coincidencia', [{ texto: D.modelo, color: C1, linea: true },
+    { texto: 'Popularidad semana anterior (MovieLens)', color: C2, linea: true },
+    { texto: 'Wikipedia semana anterior (referencia)', color: REF, linea: true, discontinua: true }]);
+  const peliculasWiki = [...new Map(W.ejemplos.map((e) => [e.movieId, e.titulo])).entries()];
+  let peliculaWiki = peliculasWiki[0][0];
+  const pintarEjemplo = () => {
+    const filas = W.ejemplos.filter((e) => e.movieId === peliculaWiki).sort((a, b) => fechaUtc(a.fecha) - fechaUtc(b.fecha));
+    const relativa = (col) => { const max = d3.max(filas, (e) => e[col]) || 1; return filas.map((e) => ({ x: fechaUtc(e.fecha), y: e[col] / max })); };
+    lineas('#g-wiki-ejemplo', { ...comunWiki, formatoY: fPct, series: [
+      { nombre: 'Ratings en MovieLens', color: C2, puntos: relativa('ratings') },
+      { nombre: 'Visitas en Wikipedia', color: C1, puntos: relativa('visitas') },
+    ] });
+  };
+  botones('#c-wiki-pelicula', peliculasWiki.map(([id, titulo]) => ({ valor: id, texto: titulo })), peliculaWiki, (v) => { peliculaWiki = v; pintarEjemplo(); });
+  leyenda('#l-wiki-ejemplo', [{ texto: 'Ratings en MovieLens', color: C2, linea: true }, { texto: 'Visitas en Wikipedia', color: C1, linea: true }]);
+  dibujar(pintarEjemplo);
+
+  // ---------- curva de entrenamiento ----------
+  const pts = D.curva.puntos, mejor = D.curva.mejor_paso;
+  d3.select('#nota-curva').text(`Corrida de validación: cada 100 pasos se evalúa en 13 semanas de 2022 y se guarda el mejor estado (paso ${mejor}). La corrida paró en el paso ${pts[pts.length - 1].paso} tras 5 evaluaciones sin mejorar. Estos son los pesos de modelo.pt, con los que se calcularon las recomendaciones de ejemplo.`);
+  const fPaso = (paso) => `${paso}`;
+  dibujar(() => lineas('#g-perdida', { x: { tipo: 'lineal' }, formatoX: fPaso, formatoTip: (paso) => `Paso ${paso}`, formatoY: d3.format('.3f'), referencia: { x: mejor, texto: `mejor paso (${mejor})` },
+    series: [{ nombre: 'Pérdida', color: C1, puntos: pts.map((p) => ({ x: p.paso, y: p.perdida })) }] }));
+  dibujar(() => lineas('#g-curva', { x: { tipo: 'lineal' }, formatoX: fPaso, formatoTip: (paso) => `Paso ${paso}`, formatoY: f3, referencia: { x: mejor, texto: `mejor paso (${mejor})` },
+    series: [{ nombre: 'Recall@20', color: C1, puntos: pts.map((p) => ({ x: p.paso, y: p['recall@20'] })) },
+             { nombre: 'NDCG@20', color: C2, puntos: pts.map((p) => ({ x: p.paso, y: p['ndcg@20'] })) }] }));
+  leyenda('#l-curva', [{ texto: 'Recall@20', color: C1, linea: true }, { texto: 'NDCG@20', color: C2, linea: true }]);
+
+  d3.select('#pie').text(`Generado el ${D.generado} con python -m src.resultados_a9. Datos: MovieLens 32M (GroupLens), licencia sólo para investigación. Visitas de Wikipedia: Wikimedia Foundation (CC0). Gráficos con d3 7.9.0 (ISC).`);
+})();
+</script>

@@ -1,0 +1,868 @@
+<style>
+.eda { display: grid; gap: var(--cds-gap-xl); max-width: 78rem; margin-inline: auto; font-family: var(--font-anthropic-sans); font-size: var(--cds-font-size-body); color: var(--color-fg); }
+.eda h1, .eda h2, .eda h3, .eda h4, .eda p, .eda ol, .eda ul { margin: 0; }
+.eda-cab { display: grid; gap: var(--cds-gap-sm); }
+.eda-etapa { font-size: var(--cds-font-size-caption); letter-spacing: .08em; text-transform: uppercase; color: var(--color-fg-muted); }
+.eda-titulo { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: calc(var(--cds-font-size-title) * 1.3); line-height: 1.15; text-wrap: balance; }
+.eda-tesis { color: var(--color-fg-muted); max-width: 72ch; line-height: 1.5; }
+.eda .eda-cifra { font-weight: 600; color: var(--color-fg); font-variant-numeric: tabular-nums; }
+.eda-nav { display: flex; flex-wrap: wrap; gap: var(--cds-gap-xs); }
+.eda-nav button, .eda-seg button, .eda-ir { font: inherit; font-size: var(--cds-font-size-caption); color: var(--color-fg); background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: 999px; padding: var(--cds-pad-xs) var(--cds-pad-sm); cursor: pointer; white-space: nowrap; }
+.eda-nav button:hover, .eda-seg button:hover, .eda-ir:hover { border-color: var(--color-fg-muted); }
+.eda-seg { display: inline-flex; flex-wrap: wrap; gap: var(--cds-gap-xs); }
+.eda-seg button[aria-pressed="true"] { background: var(--color-fg); color: var(--color-bg); border-color: var(--color-fg); }
+.eda button:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 2px; }
+.eda-seccion { display: grid; gap: var(--cds-gap-md); scroll-margin-top: var(--cds-gap-md); }
+.eda-seccion > header { display: grid; gap: var(--cds-gap-xs); }
+.eda-seccion h2 { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); line-height: 1.2; text-wrap: balance; }
+.eda-grid { display: grid; gap: var(--cds-gap-md); grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); }
+.eda-card { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); display: grid; gap: var(--cds-gap-sm); align-content: start; min-width: 0; scroll-margin-top: var(--cds-gap-md); }
+.eda-card h3 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); text-wrap: balance; }
+.eda-card h4 { font-size: var(--cds-font-size-body); font-weight: var(--cds-font-weight-medium); }
+.eda-cabcard { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: var(--cds-gap-sm); }
+.eda-cabcard > div:first-child { display: grid; gap: var(--cds-gap-xs); min-width: 0; flex: 1 1 18rem; }
+.eda-controles { display: flex; flex-wrap: wrap; gap: var(--cds-gap-sm); }
+.eda-sub { display: grid; gap: var(--cds-gap-xs); min-width: 0; align-content: start; }
+.eda-nota { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); line-height: 1.45; max-width: 80ch; }
+.eda-lectura { line-height: 1.55; max-width: 75ch; }
+.eda-tiles { display: grid; gap: var(--cds-gap-md); grid-template-columns: repeat(auto-fit, minmax(min(100%, 11.5rem), 1fr)); }
+.eda-tile { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-md) var(--cds-pad-lg); display: grid; gap: var(--cds-gap-xs); align-content: start; min-width: 0; }
+.eda-num { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.eda-cifras { display: flex; flex-wrap: wrap; gap: var(--cds-gap-md) var(--cds-gap-lg); }
+.eda-cifras > div { display: grid; gap: 2px; flex: 1 1 9rem; min-width: 0; align-content: start; }
+.eda-cifras .eda-num { font-size: calc(var(--cds-font-size-heading) * 1.35); }
+.eda-preguntas { list-style: none; padding: 0; display: grid; }
+.eda-pregunta { display: grid; grid-template-columns: 1.75rem minmax(0, 1fr) auto; gap: var(--cds-gap-xs) var(--cds-gap-sm); padding-block: var(--cds-pad-sm); border-top: 1px solid var(--color-border-line); align-items: baseline; }
+.eda-pregunta:first-child { border-top: 0; }
+.eda-pregunta > .i { color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
+.eda-pregunta > div { display: grid; gap: 2px; min-width: 0; }
+.eda-pregunta .q { font-weight: var(--cds-font-weight-medium); }
+.eda-pregunta .a { color: var(--color-fg-muted); line-height: 1.5; }
+.eda-leyenda { display: flex; flex-wrap: wrap; gap: var(--cds-gap-xs) var(--cds-gap-md); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.eda-leyenda .it { display: inline-flex; align-items: center; gap: 6px; }
+.eda-sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+.eda-sw.linea { width: 16px; height: 0; border-radius: 0; border-top: 2px solid; }
+.eda-sw.linea.discontinua { border-top-style: dashed; }
+.eda-chart { position: relative; min-width: 0; }
+.eda-chart svg { display: block; overflow: visible; }
+#g-semanal, #g-persistencia, #g-deriva, #g-ccdf-usuarios, #g-ccdf-peliculas { min-height: 260px; }
+#g-escala, #g-anual, #g-acumulado { min-height: 240px; }
+#g-generos { min-height: 408px; }
+.eda-eje text, .eda-txt { font-family: var(--font-anthropic-sans); font-size: var(--cds-font-size-caption); fill: var(--color-fg-muted); }
+.eda-eje path, .eda-eje line { stroke: var(--cds-chart-axis); }
+.eda-rejilla line { stroke: var(--cds-chart-grid); }
+.eda-tip { position: absolute; top: 4px; left: 0; z-index: 2; pointer-events: none; display: grid; gap: 2px; min-width: 10rem; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); border-radius: var(--cds-radius); box-shadow: var(--cds-shadow-popover); padding: var(--cds-pad-xs) var(--cds-pad-sm); font-size: var(--cds-font-size-caption); }
+.eda-tip[hidden] { display: none; }
+.eda-tip .t { color: var(--cds-text-secondary); }
+.eda-tip .f { display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.eda-tip .f b { margin-left: auto; padding-left: var(--cds-pad-sm); font-weight: 600; }
+.eda-tip .s { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.eda-tabla { overflow-x: auto; min-width: 0; }
+.eda-tabla table { border-collapse: collapse; width: 100%; font-size: var(--cds-font-size-caption); font-variant-numeric: tabular-nums; }
+.eda-tabla th { text-align: left; font-weight: var(--cds-font-weight-medium); color: var(--color-fg-muted); border-bottom: 1px solid var(--color-border-line); padding: var(--cds-pad-xs) var(--cds-pad-sm); vertical-align: bottom; }
+.eda-tabla td { border-bottom: 1px solid var(--color-border-line); padding: var(--cds-pad-xs) var(--cds-pad-sm); vertical-align: top; line-height: 1.45; }
+.eda-tabla tr:last-child td { border-bottom: 0; }
+.eda-tabla .n { text-align: right; white-space: nowrap; }
+.eda-tabla .corta { white-space: nowrap; }
+.eda-tabla .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .95em; }
+.eda-tabla td.estable { color: var(--color-ok); }
+.eda-pill { display: inline-block; border: 1px solid currentColor; border-radius: 999px; padding: 0 var(--cds-pad-sm); white-space: nowrap; }
+.eda-pill.ok { color: var(--color-ok); }
+.eda-pill.menor { color: var(--color-fg-muted); }
+.eda-pill.decision { color: var(--color-fg); font-weight: var(--cds-font-weight-medium); }
+.eda-lista { padding-left: 1.2em; display: grid; gap: var(--cds-gap-xs); line-height: 1.5; max-width: 80ch; }
+.eda-fallo { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: inherit; color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+.eda-fallo::before { content: ""; width: .375rem; height: .375rem; border-radius: 50%; background: var(--color-bad); }
+.eda [data-dash-source-state=empty] { color: transparent; }
+.eda [data-dash-source-state=refreshing] { opacity: .5; transition: opacity var(--cds-dur-slow); }
+</style>
+
+<div class="eda">
+  <header class="eda-cab" id="inicio">
+    <p class="eda-etapa">Proyecto integrador · notebook 01_eda</p>
+    <h1 class="eda-titulo">EDA MovieLens 32M</h1>
+    <p class="eda-tesis">El problema lo definen los usuarios que regresan y la popularidad reciente. En 2023 hay <span class="eda-cifra dash-skeleton" data-source="resumen" data-field="evaluables_2023" data-row="0" data-fmt="int">—</span> usuarios evaluables por semana, el top 20 de la semana anterior capta <span class="eda-cifra dash-skeleton" data-source="persistencia_periodos" data-field="veces" data-where="periodo=2023" data-fmt="veces">—</span> más que el top 20 histórico, y 2022 representa bien a 2023 (PSI máximo <span class="eda-cifra dash-skeleton" data-source="resumen" data-field="psi_max_2022_2023" data-row="0" data-fmt="dec3">—</span>).</p>
+    <nav class="eda-nav" aria-label="Secciones">
+      <button type="button" data-ir="resumen">Resumen</button>
+      <button type="button" data-ir="depurar">O · S: obtener y depurar</button>
+      <button type="button" data-ir="explorar">E: explorar</button>
+      <button type="button" data-ir="modelar">M: modelar</button>
+      <button type="button" data-ir="interpretar">N: interpretar</button>
+    </nav>
+  </header>
+
+  <section class="eda-seccion" id="resumen">
+    <div class="eda-tiles">
+      <div class="eda-tile" id="t-ratings">
+        <span class="eda-nota">Ratings</span>
+        <span class="eda-num dash-skeleton" data-source="resumen" data-field="ratings" data-row="0" data-fmt="compact">—</span>
+        <span class="eda-nota">del <span class="dash-skeleton" data-source="resumen" data-field="primer_rating" data-row="0" data-fmt="texto">—</span> al <span class="dash-skeleton" data-source="resumen" data-field="ultimo_rating" data-row="0" data-fmt="texto">—</span></span>
+      </div>
+      <div class="eda-tile" id="t-usuarios">
+        <span class="eda-nota">Usuarios</span>
+        <span class="eda-num dash-skeleton" data-source="resumen" data-field="usuarios" data-row="0" data-fmt="compact">—</span>
+        <span class="eda-nota">todos con al menos <span class="dash-skeleton" data-source="contrato" data-field="resultado" data-where="chequeo=Ratings por usuario, mínimo" data-fmt="texto">—</span> ratings</span>
+      </div>
+      <div class="eda-tile" id="t-peliculas">
+        <span class="eda-nota">Películas con rating</span>
+        <span class="eda-num dash-skeleton" data-source="resumen" data-field="peliculas_con_rating" data-row="0" data-fmt="compact">—</span>
+        <span class="eda-nota">de <span class="dash-skeleton" data-source="resumen" data-field="peliculas_catalogo" data-row="0" data-fmt="int">—</span> en el catálogo</span>
+      </div>
+      <div class="eda-tile" id="t-alta">
+        <span class="eda-nota">Ratings en la semana de alta</span>
+        <span class="eda-num dash-skeleton" data-source="resumen" data-field="ratings_en_alta" data-row="0" data-fmt="pct1">—</span>
+        <span class="eda-nota">ocurren en la primera semana de su usuario</span>
+      </div>
+      <div class="eda-tile" id="t-evaluables">
+        <span class="eda-nota">Usuarios evaluables por semana, 2023</span>
+        <span class="eda-num dash-skeleton" data-source="resumen" data-field="evaluables_2023" data-row="0" data-fmt="int">—</span>
+        <span class="eda-nota"><span class="dash-skeleton" data-source="resumen" data-field="aristas_2023" data-row="0" data-fmt="int">—</span> aristas a predecir por semana</span>
+      </div>
+    </div>
+
+    <div class="eda-card" id="preguntas">
+      <h3>Las cinco preguntas del EDA</h3>
+      <ol class="eda-preguntas">
+        <li class="eda-pregunta"><span class="i">1</span><div><span class="q">¿Los datos son confiables?</span><span class="a">Sí, en lo que importa para el grafo: <span class="eda-cifra dash-skeleton" data-source="contrato" data-field="resultado" data-where="chequeo=Pares (usuario, película) repetidos" data-fmt="texto">—</span> pares repetidos y <span class="eda-cifra dash-skeleton" data-source="contrato" data-field="resultado" data-where="chequeo=movieId de ratings y tags fuera de movies" data-fmt="texto">—</span> ids huérfanos. Pero la escala del rating cambió el <span class="eda-cifra dash-skeleton" data-source="contrato" data-field="resultado" data-where="chequeo=Primera media estrella" data-fmt="texto">—</span> con las medias estrellas.</span></div><button type="button" class="eda-ir" data-ir="depurar">Ver</button></li>
+        <li class="eda-pregunta"><span class="i">2</span><div><span class="q">¿Qué tan estable es el sistema en el tiempo?</span><span class="a">No es estacionario. Desde 2015 se asienta en unos <span class="eda-cifra dash-skeleton" data-source="periodos" data-field="usuarios_que_regresan" data-where="periodo=2015–2021" data-fmt="int">—</span> usuarios que regresan por semana, y validación y test se parecen (<span class="eda-cifra dash-skeleton" data-source="periodos" data-field="usuarios_que_regresan" data-where="periodo=2022 (validación)" data-fmt="int">—</span> y <span class="eda-cifra dash-skeleton" data-source="periodos" data-field="usuarios_que_regresan" data-where="periodo=2023 (test)" data-fmt="int">—</span>).</span></div><button type="button" class="eda-ir" data-ir="e1">Ver</button></li>
+        <li class="eda-pregunta"><span class="i">3</span><div><span class="q">¿A quién se puede evaluar con un grafo?</span><span class="a">Sólo a los usuarios que regresan: el <span class="eda-cifra dash-skeleton" data-source="resumen" data-field="ratings_en_alta" data-row="0" data-fmt="pct1">—</span> de los ratings ocurre en la semana de alta del usuario, cuando todavía no tiene vecindario. En 2023 quedan <span class="eda-cifra dash-skeleton" data-source="resumen" data-field="evaluables_2023" data-row="0" data-fmt="int">—</span> usuarios evaluables por semana.</span></div><button type="button" class="eda-ir" data-ir="e2">Ver</button></li>
+        <li class="eda-pregunta"><span class="i">4</span><div><span class="q">¿Qué tan fuerte es la popularidad?</span><span class="a">Concentrada y de corto plazo: el 1 % de las películas recibe el <span class="eda-cifra dash-skeleton" data-source="resumen" data-field="top1_cuota" data-row="0" data-fmt="pct0">—</span> de los ratings, y en 2023 el top 20 de la semana anterior capta <span class="eda-cifra dash-skeleton" data-source="persistencia_periodos" data-field="veces" data-where="periodo=2023" data-fmt="veces">—</span> más que el histórico.</span></div><button type="button" class="eda-ir" data-ir="e3">Ver</button></li>
+        <li class="eda-pregunta"><span class="i">5</span><div><span class="q">¿La validación (2022) representa al test (2023)?</span><span class="a">Sí: entre 2022 y 2023 el PSI máximo es <span class="eda-cifra dash-skeleton" data-source="resumen" data-field="psi_max_2022_2023" data-row="0" data-fmt="dec3">—</span> y la distancia KS máxima <span class="eda-cifra dash-skeleton" data-source="resumen" data-field="ks_max_2022_2023" data-row="0" data-fmt="dec3">—</span>, muy por debajo del umbral de cambio moderado del PSI (0.1).</span></div><button type="button" class="eda-ir" data-ir="m2">Ver</button></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="eda-seccion" id="depurar">
+    <header>
+      <span class="eda-etapa">O · Obtener · S · Depurar</span>
+      <h2>Los datos están limpios, pero la escala del rating cambió</h2>
+      <p class="eda-lectura">MovieLens 32M de GroupLens, convertido de CSV a Parquet con src/datos.py. Sin nulos, sin pares repetidos y sin ids huérfanos. Lo que obliga a decidir es la escala: con las medias estrellas, el valor del rating dejó de ser comparable en el tiempo, así que se modela la interacción y no el valor.</p>
+    </header>
+    <div class="eda-grid">
+      <div class="eda-card" id="fuentes">
+        <h3>Tablas de origen</h3>
+        <p class="eda-nota">El timestamp es el momento en que se ingresó el rating (UTC), no cuándo se vio la película. Los usuarios no tienen atributos, sólo un id.</p>
+        <div class="eda-tabla">
+          <table data-source="fuentes" data-row-key="tabla">
+            <thead><tr><th data-field="tabla">Tabla</th><th class="n" data-field="filas" data-fmt="int">Filas</th><th data-field="columnas">Columnas</th><th data-field="llave">Llave</th><th class="corta" data-field="periodo">Periodo (UTC)</th><th class="n" data-field="mb" data-fmt="int">MB</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="eda-card" id="escala">
+        <h3>La escala del rating, antes y después de las medias estrellas</h3>
+        <p class="eda-nota">Proporción de ratings en cada valor. Hasta 2002 sólo había estrellas enteras; desde 2016 las medias estrellas son el <span class="dash-skeleton" data-source="contrato" data-field="resultado" data-where="chequeo=Medias estrellas desde 2016" data-fmt="texto">—</span> de los ratings.</p>
+        <div class="eda-leyenda"><span class="it"><span class="eda-sw" data-color="muted"></span>Hasta 2002</span><span class="it"><span class="eda-sw" data-color="0"></span>Desde 2016</span></div>
+        <div class="eda-chart dash-skeleton" id="g-escala" data-source="ratings_valor"></div>
+      </div>
+    </div>
+    <div class="eda-card" id="contrato">
+      <h3>Contrato de datos</h3>
+      <p class="eda-nota">Cada chequeo con su resultado y lo que se hace con él. Los invariantes son assert en el notebook: si los datos cambian, se detiene. No se borra nada de los Parquet.</p>
+      <div class="eda-tabla">
+        <table data-source="contrato" data-row-key="chequeo">
+          <thead><tr><th data-field="chequeo">Chequeo</th><th data-field="resultado">Resultado</th><th data-field="accion">Acción</th><th data-field="tipo" data-pill>Tipo</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="eda-seccion" id="explorar">
+    <header>
+      <span class="eda-etapa">E · Explorar</span>
+      <h2>Un sistema que cambia, usuarios que no vuelven y una popularidad de corto plazo</h2>
+    </header>
+
+    <div class="eda-card" id="e1">
+      <div class="eda-cabcard">
+        <div>
+          <h3>E1 · Actividad por semana</h3>
+          <p class="eda-nota">Semanas de lunes a domingo (UTC), sin la última, incompleta. En gris, validación (2022) y test (2023).</p>
+        </div>
+        <div class="eda-controles">
+          <div class="eda-seg" role="group" aria-label="Serie">
+            <button type="button" data-vista="ratings" aria-pressed="true">Ratings</button>
+            <button type="button" data-vista="usuarios" aria-pressed="false">Usuarios</button>
+          </div>
+          <div class="eda-seg" role="group" aria-label="Periodo">
+            <button type="button" data-desde="todo" aria-pressed="true">1995–2023</button>
+            <button type="button" data-desde="2015" aria-pressed="false">Desde 2015</button>
+          </div>
+        </div>
+      </div>
+      <div class="eda-leyenda" id="ley-e1"></div>
+      <div class="eda-chart dash-skeleton" id="g-semanal" data-source="semanal"></div>
+      <h4>Mediana semanal por periodo</h4>
+      <div class="eda-tabla">
+        <table data-source="periodos" data-row-key="periodo">
+          <thead><tr><th data-field="periodo">Periodo</th><th class="n" data-field="ratings" data-fmt="int">Ratings</th><th class="n" data-field="usuarios_activos" data-fmt="int">Usuarios activos</th><th class="n" data-field="usuarios_que_regresan" data-fmt="int">Usuarios que regresan</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="eda-lectura">Hay tres regímenes: el arranque, con un hueco de casi dos años entre 1997 y 1999; una etapa estable hasta 2014; y crecimiento desde 2015, donde caen validación y test. Los picos de ratings coinciden con llegadas masivas de usuarios nuevos, mientras que los usuarios que regresan son mucho más estables. Predecir semana a semana pide una partición temporal y un modelo que se actualice cada semana.</p>
+    </div>
+
+    <div class="eda-card" id="e2">
+      <h3>E2 · ¿Los usuarios vuelven?</h3>
+      <p class="eda-nota">Una arista es nueva por el lado del usuario (o de la película) si cae en su semana de alta.</p>
+      <div class="eda-cifras">
+        <div><span class="eda-num dash-skeleton" data-source="resumen" data-field="usuarios_una_semana" data-row="0" data-fmt="pct1">—</span><span class="eda-nota">de los usuarios sólo está activo una semana</span></div>
+        <div><span class="eda-num dash-skeleton" data-source="resumen" data-field="ratings_en_alta" data-row="0" data-fmt="pct1">—</span><span class="eda-nota">de los ratings ocurre en la semana de alta de su usuario</span></div>
+        <div><span class="eda-num dash-skeleton" data-source="resumen" data-field="vuelven_8_semanas" data-row="0" data-fmt="pct1">—</span><span class="eda-nota">de los usuarios vuelve 8 semanas o más después de su alta</span></div>
+      </div>
+      <h4>Composición de las aristas de cada año</h4>
+      <div class="eda-chart dash-skeleton" id="g-anual" data-source="anual"></div>
+      <p class="eda-lectura">La mayoría de las aristas de cada año es de usuarios sin historia, que no tienen vecindario ni atributos; las de películas nuevas son menos del 1 %. Sólo las aristas con ambos extremos conocidos pueden evaluarse con un grafo: el arranque en frío de este problema es de usuarios, no de películas.</p>
+    </div>
+
+    <div class="eda-card" id="e3">
+      <h3>E3 · Concentración y persistencia de la popularidad</h3>
+      <div class="eda-cifras">
+        <div><span class="eda-num dash-skeleton" data-source="resumen" data-field="top1_cuota" data-row="0" data-fmt="pct0">—</span><span class="eda-nota">de los ratings va al 1 % de películas más calificadas (<span class="dash-skeleton" data-source="resumen" data-field="top1_peliculas" data-row="0" data-fmt="int">—</span> películas)</span></div>
+        <div><span class="eda-num dash-skeleton" data-source="resumen" data-field="gini_peliculas" data-row="0" data-fmt="dec2">—</span><span class="eda-nota">Gini del grado de películas</span></div>
+        <div><span class="eda-num dash-skeleton" data-source="resumen" data-field="gini_usuarios" data-row="0" data-fmt="dec2">—</span><span class="eda-nota">Gini del grado de usuarios</span></div>
+      </div>
+      <h4>Películas de la semana siguiente que ya estaban en el top 20</h4>
+      <p class="eda-nota">Promedio por usuario, sólo usuarios que regresan y películas conocidas. No quita lo ya calificado, así que es una cota inferior del Recall@20 de cada popularidad.</p>
+      <div class="eda-leyenda"><span class="it"><span class="eda-sw linea" data-color="0"></span>Top 20 de la semana anterior</span><span class="it"><span class="eda-sw linea" data-color="1"></span>Top 20 histórico</span></div>
+      <div class="eda-chart dash-skeleton" id="g-persistencia" data-source="persistencia"></div>
+      <div class="eda-tabla">
+        <table data-source="persistencia_periodos" data-row-key="periodo">
+          <thead><tr><th data-field="periodo">Periodo</th><th class="n" data-field="reciente" data-fmt="pct1">Top 20 de la semana anterior</th><th class="n" data-field="historico" data-fmt="pct1">Top 20 histórico</th><th class="n" data-field="veces" data-fmt="veces">Cociente</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="eda-lectura">Lo reciente predice mucho mejor que lo acumulado, en todo el periodo. La serie es volátil, con picos de pocas semanas: la popularidad útil es de corto plazo. Por eso la línea base a vencer es la popularidad de la semana anterior, y el modelo necesita saber cuándo ocurrió cada arista.</p>
+    </div>
+
+    <div class="eda-grid">
+      <div class="eda-card" id="e4">
+        <h3>E4 · Películas nuevas: ratings acumulados</h3>
+        <p class="eda-nota">Desde su primera aparición, para las <span class="dash-skeleton" data-source="resumen" data-field="peliculas_observadas_un_año" data-row="0" data-fmt="int">—</span> películas observadas al menos un año. Escala logarítmica.</p>
+        <div class="eda-leyenda"><span class="it"><span class="eda-sw linea" data-color="0"></span>Mediana</span><span class="it"><span class="eda-sw" data-color="0" data-opacidad="0.25"></span>Percentiles 25–75</span><span class="it"><span class="eda-sw linea discontinua" data-color="0"></span>Percentil 90</span></div>
+        <div class="eda-chart dash-skeleton" id="g-acumulado" data-source="acumulado"></div>
+        <div class="eda-cifras">
+          <div><span class="eda-num dash-skeleton" data-source="resumen" data-field="estreno_mismo_año_o_siguiente" data-row="0" data-fmt="pct0">—</span><span class="eda-nota">recibe su primer rating el año de estreno o el siguiente</span></div>
+          <div><span class="eda-num dash-skeleton" data-source="resumen" data-field="años_mediana_estreno_a_primer_rating" data-row="0" data-fmt="int">—</span><span class="eda-nota">años de mediana entre el estreno y el primer rating</span></div>
+        </div>
+        <p class="eda-lectura">La película nueva típica casi no acumula interacciones, y nueva en la plataforma casi nunca es recién estrenada. Para la pregunta 2 importa el régimen de 0 a unas decenas de ratings, donde al principio el contenido es la única señal.</p>
+      </div>
+      <div class="eda-card" id="e5">
+        <h3>E5 · Géneros y tags</h3>
+        <p class="eda-nota">Películas por género; una película puede tener varios (<span class="dash-skeleton" data-source="resumen" data-field="generos_por_pelicula" data-row="0" data-fmt="dec2">—</span> en promedio).</p>
+        <div class="eda-chart dash-skeleton" id="g-generos" data-source="generos"></div>
+        <div class="eda-cifras">
+          <div><span class="eda-num dash-skeleton" data-source="resumen" data-field="pct_usuarios_con_tags" data-row="0" data-fmt="pct1">—</span><span class="eda-nota">de los usuarios puso algún tag</span></div>
+          <div><span class="eda-num dash-skeleton" data-source="resumen" data-field="tags_top1" data-row="0" data-fmt="pct0">—</span><span class="eda-nota">de los tags los puso el 1 % más activo</span></div>
+          <div><span class="eda-num dash-skeleton" data-source="resumen" data-field="tags_sin_rating" data-row="0" data-fmt="pct0">—</span><span class="eda-nota">de los tags cae sobre pares sin rating</span></div>
+        </div>
+        <p class="eda-lectura">Los géneros son el único atributo de contenido completo dentro del dataset. Los tags son escasos y concentrados, así que quedan fuera del modelo.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="eda-seccion" id="modelar">
+    <header>
+      <span class="eda-etapa">M · Modelar</span>
+      <h2>Colas pesadas y una población estable entre años</h2>
+      <p class="eda-lectura">Dos modelos descriptivos que convierten los patrones en parámetros y tamaños de efecto. No predicen nada.</p>
+    </header>
+
+    <div class="eda-card" id="m1">
+      <h3>M1 · Grados: ¿cola pesada o ley de potencia?</h3>
+      <p class="eda-nota">CCDF en escala log-log con la ley de potencia discreta ajustada por máxima verosimilitud desde x_min, el valor que minimiza la distancia KS (Clauset, Shalizi y Newman, 2009). La línea punteada gris marca x_min.</p>
+      <div class="eda-leyenda"><span class="it"><span class="eda-sw linea" data-color="0"></span>Empírica</span><span class="it"><span class="eda-sw linea discontinua" data-color="1"></span>Ley de potencia ajustada</span></div>
+      <div class="eda-grid">
+        <div class="eda-sub">
+          <h4>Usuarios</h4>
+          <p class="eda-nota">α = <span class="eda-cifra dash-skeleton" data-source="ley_potencia" data-field="alfa" data-where="nodo=usuarios" data-fmt="dec2">—</span> ± <span class="dash-skeleton" data-source="ley_potencia" data-field="error_estandar" data-where="nodo=usuarios" data-fmt="dec3">—</span> desde <span class="dash-skeleton" data-source="ley_potencia" data-field="x_min" data-where="nodo=usuarios" data-fmt="int">—</span> ratings: sólo el <span class="dash-skeleton" data-source="ley_potencia" data-field="pct_cola" data-where="nodo=usuarios" data-fmt="pct1">—</span> de los usuarios.</p>
+          <div class="eda-chart dash-skeleton" id="g-ccdf-usuarios" data-source="ccdf ley_potencia"></div>
+        </div>
+        <div class="eda-sub">
+          <h4>Películas</h4>
+          <p class="eda-nota">α = <span class="eda-cifra dash-skeleton" data-source="ley_potencia" data-field="alfa" data-where="nodo=películas" data-fmt="dec2">—</span> ± <span class="dash-skeleton" data-source="ley_potencia" data-field="error_estandar" data-where="nodo=películas" data-fmt="dec3">—</span> desde <span class="dash-skeleton" data-source="ley_potencia" data-field="x_min" data-where="nodo=películas" data-fmt="int">—</span> ratings: el <span class="dash-skeleton" data-source="ley_potencia" data-field="pct_cola" data-where="nodo=películas" data-fmt="pct1">—</span> de las películas.</p>
+          <div class="eda-chart dash-skeleton" id="g-ccdf-peliculas" data-source="ccdf ley_potencia"></div>
+        </div>
+      </div>
+      <div class="eda-tabla">
+        <table data-source="ley_potencia" data-row-key="nodo">
+          <thead><tr><th data-field="nodo">Nodo</th><th class="n" data-field="alfa" data-fmt="dec3">α</th><th class="n" data-field="error_estandar" data-fmt="dec4">Error estándar de α</th><th class="n" data-field="x_min" data-fmt="int">x_min</th><th class="n" data-field="nodos_cola" data-fmt="int">Nodos en la cola</th><th class="n" data-field="pct_cola" data-fmt="pct1">% en la cola</th><th class="n" data-field="ks" data-fmt="dec3">Distancia KS</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="eda-lectura">Las dos colas son pesadas, pero ninguna es una ley de potencia en todo el rango. En películas la recta ajusta bien hasta unos mil ratings y luego la cola cae más rápido, porque el número de usuarios pone un tope. En usuarios el cuerpo es curvo y sólo la cola extrema sigue la recta. Sin compararla con alternativas como la lognormal no se afirma que la red sea libre de escala (Broido y Clauset, 2019). Lo que sí implica: hubs de películas muy fuertes, que favorecen agregar a los vecinos por promedio y medir la cobertura del catálogo.</p>
+    </div>
+
+    <div class="eda-card" id="m2">
+      <div class="eda-cabcard">
+        <div>
+          <h3>M2 · Deriva entre años: ¿2022 representa a 2023?</h3>
+          <p class="eda-nota">Distribución acumulada de cada variable al nivel en que se evalúa (usuario que regresa, película conocida), por año, en escala logarítmica. Con cientos de miles de observaciones cualquier diferencia es significativa, así que se miden tamaños de efecto.</p>
+        </div>
+        <div class="eda-seg" role="group" aria-label="Variable">
+          <button type="button" data-variable="0" aria-pressed="true">Historial del usuario</button>
+          <button type="button" data-variable="1" aria-pressed="false">Popularidad de la película</button>
+          <button type="button" data-variable="2" aria-pressed="false">Aristas por usuario-semana</button>
+        </div>
+      </div>
+      <div class="eda-leyenda"><span class="it"><span class="eda-sw linea" data-color="muted"></span>2021 (entrenamiento)</span><span class="it"><span class="eda-sw linea" data-color="0"></span>2022 (validación)</span><span class="it"><span class="eda-sw linea" data-color="1"></span>2023 (test)</span></div>
+      <div class="eda-chart dash-skeleton" id="g-deriva" data-source="deriva_cuantiles"></div>
+      <div class="eda-tabla">
+        <table data-source="deriva" data-row-key="variable">
+          <thead><tr><th data-field="variable">Variable</th><th class="n" data-field="mediana_2021" data-fmt="int">Mediana 2021</th><th class="n" data-field="mediana_2022" data-fmt="int">Mediana 2022</th><th class="n" data-field="mediana_2023" data-fmt="int">Mediana 2023</th><th class="n" data-field="ks_2021_2022" data-fmt="dec3">KS 2021→2022</th><th class="n" data-field="psi_2021_2022" data-fmt="dec3">PSI 2021→2022</th><th class="n" data-field="ks_2022_2023" data-fmt="dec3">KS 2022→2023</th><th class="n" data-field="psi_2022_2023" data-fmt="dec3">PSI 2022→2023</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="eda-nota">PSI: menos de 0.1 es estable (en verde), de 0.1 a 0.25 es un cambio moderado y más de 0.25 un cambio grande. Calculado con src/estadistica.py.</p>
+      <p class="eda-lectura">Las tres distribuciones son estables, y el cambio de 2022 a 2023 es todavía menor que el de 2021 a 2022. 2022 es un buen sustituto de 2023 para elegir hiperparámetros, y una diferencia entre validación y test no se explicaría por un cambio en la población evaluada. Es descriptivo: con 2023 no se elige nada.</p>
+    </div>
+  </section>
+
+  <section class="eda-seccion" id="interpretar">
+    <header>
+      <span class="eda-etapa">N · Interpretar</span>
+      <h2>De cada hallazgo a la decisión que tomó el proyecto</h2>
+    </header>
+    <div class="eda-card" id="decisiones">
+      <div class="eda-tabla">
+        <table data-source="decisiones" data-row-key="n">
+          <thead><tr><th class="n" data-field="n" data-fmt="int">#</th><th data-field="hallazgo">Hallazgo</th><th data-field="evidencia">Evidencia</th><th data-field="decision">Decisión adoptada</th><th class="mono" data-field="donde">Dónde</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="eda-card" id="limitaciones">
+      <h3>Limitaciones que el EDA no resuelve</h3>
+      <ul class="eda-lista">
+        <li>El timestamp es la fecha del rating, no la del consumo: la semana t+1 es la semana en que el usuario califica, y una ráfaga mezcla películas vistas en años distintos.</li>
+        <li>GroupLens sólo incluye usuarios con al menos <span class="dash-skeleton" data-source="contrato" data-field="resultado" data-where="chequeo=Ratings por usuario, mínimo" data-fmt="texto">—</span> ratings, así que deja fuera a los usuarios ocasionales; los resultados no se generalizan a ellos.</li>
+        <li>MovieLens es a su vez un recomendador: lo que la gente califica depende en parte de lo que la plataforma le mostró.</li>
+      </ul>
+      <p class="eda-nota">Referencias: Harper y Konstan (2015), The MovieLens Datasets: History and Context, ACM TiiS. Clauset, Shalizi y Newman (2009), Power-law distributions in empirical data, SIAM Review. Broido y Clauset (2019), Scale-free networks are rare, Nature Communications. Datos: MovieLens 32M de GroupLens, licencia sólo para investigación.</p>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const C = dash.colors;
+  const MUTED = 'var(--cds-chart-muted)';
+  const F = {
+    int: d3.format(',.0f'),
+    pct0: d3.format('.0%'),
+    pct1: d3.format('.1%'),
+    dec2: d3.format('.2f'),
+    dec3: d3.format('.3f'),
+    dec4: d3.format('.4f'),
+    compact: (v) => new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(v),
+    veces: (v) => d3.format('.1f')(v) + '×',
+    texto: (v) => String(v),
+  };
+  const es = d3.timeFormatLocale({
+    dateTime: '%x, %X', date: '%d/%m/%Y', time: '%H:%M:%S', periods: ['a. m.', 'p. m.'],
+    days: ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'],
+    shortDays: ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'],
+    months: ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'],
+    shortMonths: ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'],
+  });
+  const fechaLarga = es.utcFormat('%-d %b %Y');
+  const año = es.utcFormat('%Y');
+  const pctPequeño = d3.format('.2~p');
+  const SUP = { '-': '⁻', 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' };
+  const potencia = (v) => { const e = Math.round(Math.log10(v)); return e === 0 ? '1' : '10' + [...String(e)].map((c) => SUP[c]).join(''); };
+  const potencias = ([a, b]) => d3.range(Math.ceil(Math.log10(a) - 1e-9), Math.floor(Math.log10(b) + 1e-9) + 1).map((e) => 10 ** e);
+  const escalones = ([a, b]) => potencias([a / 10, b * 10]).flatMap((p) => [p, 2 * p, 5 * p]).filter((v) => v >= a * (1 - 1e-9) && v <= b * (1 + 1e-9));
+  const valido = (v, log) => v !== null && v !== undefined && Number.isFinite(+v) && (!log || v > 0);
+  const filas = (id) => { const d = dash.data(id); return d.status === 'ok' ? d.data : null; };
+  const VARIABLES = ['Historial previo del usuario evaluado', 'Popularidad previa de la película objetivo', 'Aristas objetivo por usuario-semana'];
+
+  // Fechas: cada semana se convierte a Date una sola vez por versión de los datos
+  const conFecha = new WeakMap();
+  const fechadas = (arr) => {
+    if (!conFecha.has(arr)) conFecha.set(arr, arr.map((d) => ({ ...d, f: new Date(d.semana + 'T00:00:00Z') })));
+    return conFecha.get(arr);
+  };
+
+  // ---------------------------------------------------------------- estado de carga
+  function listo(el, ids) {
+    const estados = ids.map((id) => dash.data(id).status);
+    if (estados.every((s) => s === 'ok')) { el.classList.remove('dash-skeleton'); return true; }
+    el.replaceChildren();
+    if (estados.some((s) => s === 'error' || s === 'missing')) {
+      el.classList.remove('dash-skeleton');
+      const p = document.createElement('div');
+      p.className = 'eda-fallo';
+      p.textContent = 'No se pudo cargar';
+      el.append(p);
+    } else {
+      el.classList.add('dash-skeleton');
+    }
+    return false;
+  }
+
+  function filaDe(el, datos) {
+    if (el.dataset.where) {
+      const i = el.dataset.where.indexOf('=');
+      const campo = el.dataset.where.slice(0, i);
+      const valor = decodeURIComponent(el.dataset.where.slice(i + 1));
+      return datos.find((r) => String(r[campo]) === valor);
+    }
+    return datos[Number(el.dataset.row ?? 0)];
+  }
+
+  function llenarMarcas() {
+    document.querySelectorAll('.eda [data-fmt][data-field]:not(th)').forEach((el) => {
+      const d = dash.data(el.dataset.source);
+      if (d.status !== 'ok') {
+        el.textContent = '—';
+        el.classList.toggle('dash-skeleton', d.status === 'loading');
+        return;
+      }
+      const fila = filaDe(el, d.data);
+      const v = fila ? fila[el.dataset.field] : undefined;
+      el.textContent = valido(v) || typeof v === 'string' ? F[el.dataset.fmt](v) : '—';
+      el.classList.remove('dash-skeleton');
+    });
+  }
+
+  const PILL = { 'invariante': 'ok', 'anomalía': 'menor', 'decisión': 'decision' };
+  function llenarTabla(tabla) {
+    const d = dash.data(tabla.dataset.source);
+    const cuerpo = tabla.tBodies[0];
+    if (d.status !== 'ok') { cuerpo.replaceChildren(); return; }
+    const columnas = [...tabla.tHead.rows[0].cells].map((th) => ({
+      campo: th.dataset.field, fmt: th.dataset.fmt || 'texto', clase: th.className, pill: th.hasAttribute('data-pill'),
+    }));
+    cuerpo.replaceChildren(...d.data.map((f) => {
+      const tr = document.createElement('tr');
+      for (const c of columnas) {
+        const td = document.createElement('td');
+        if (c.clase) td.className = c.clase;
+        const v = f[c.campo];
+        const texto = valido(v) || typeof v === 'string' ? F[c.fmt](v) : '—';
+        if (c.pill) {
+          const s = document.createElement('span');
+          s.className = 'eda-pill ' + (PILL[v] ?? 'menor');
+          s.textContent = texto;
+          td.append(s);
+        } else {
+          td.textContent = texto;
+        }
+        if (c.campo.startsWith('psi_') && Number(v) < 0.1) td.classList.add('estable');
+        tr.append(td);
+      }
+      return tr;
+    }));
+  }
+
+  // ---------------------------------------------------------------- piezas de los gráficos
+  function lienzo(el, alto) {
+    el.replaceChildren();
+    const ancho = Math.max(280, el.clientWidth);
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${ancho} ${alto}`);
+    return { svg, ancho };
+  }
+
+  function medir(svg, textos) {
+    const t = svg.append('text').attr('class', 'eda-txt');
+    let max = 0;
+    for (const s of textos) { t.text(s); max = Math.max(max, t.node().getComputedTextLength()); }
+    t.remove();
+    return max;
+  }
+
+  function ejes(g, x, y, { ancho, alto, m, valoresX, valoresY, formatoX, formatoY }) {
+    const util = ancho - m.l - m.r;
+    g.append('g').attr('class', 'eda-rejilla').attr('transform', `translate(${m.l},0)`)
+      .call(d3.axisLeft(y).tickValues(valoresY).tickSize(-util).tickFormat(() => ''))
+      .call((a) => a.select('.domain').remove());
+    g.append('g').attr('class', 'eda-eje').attr('transform', `translate(${m.l},0)`)
+      .call(d3.axisLeft(y).tickValues(valoresY).tickSize(0).tickPadding(8).tickFormat(formatoY))
+      .call((a) => a.select('.domain').remove())
+      .attr('font-size', null).attr('font-family', null);
+    const ejeX = d3.axisBottom(x).tickSizeOuter(0).tickPadding(6);
+    if (valoresX) ejeX.tickValues(valoresX); else if (x.ticks) ejeX.ticks(Math.max(2, Math.floor(util / 80)));
+    if (formatoX) ejeX.tickFormat(formatoX);
+    g.append('g').attr('class', 'eda-eje').attr('transform', `translate(0,${alto - m.b})`).call(ejeX)
+      .attr('font-size', null).attr('font-family', null);
+  }
+
+  function tooltip(el) {
+    const tip = document.createElement('div');
+    tip.className = 'eda-tip';
+    tip.hidden = true;
+    el.append(tip);
+    return {
+      mostrar(x, titulo, renglones) {
+        tip.replaceChildren();
+        const t = document.createElement('div');
+        t.className = 't';
+        t.textContent = titulo;
+        tip.append(t);
+        for (const r of renglones) {
+          const f = document.createElement('div');
+          f.className = 'f';
+          if (r.color) { const s = document.createElement('span'); s.className = 's'; s.style.background = r.color; f.append(s); }
+          const n = document.createElement('span'); n.textContent = r.nombre; f.append(n);
+          const b = document.createElement('b'); b.textContent = r.valor; f.append(b);
+          tip.append(f);
+        }
+        tip.hidden = false;
+        const escala = el.clientWidth / (el.querySelector('svg')?.viewBox.baseVal.width || el.clientWidth);
+        const px = x * escala;
+        const w = tip.offsetWidth;
+        tip.style.left = (px + 14 + w <= el.clientWidth ? px + 14 : Math.max(0, px - 14 - w)) + 'px';
+      },
+      ocultar() { tip.hidden = true; },
+    };
+  }
+
+  // Gráfico de líneas genérico: series sobre las mismas filas, banda opcional, zonas sombreadas y referencias
+  function lineas(el, cfg) {
+    const alto = cfg.alto ?? 260;
+    const { svg, ancho } = lienzo(el, alto);
+    const datos = cfg.filas;
+    const x = (cfg.logX ? d3.scaleLog() : cfg.tiempo ? d3.scaleUtc() : d3.scaleLinear()).domain(cfg.dominioX ?? d3.extent(datos, cfg.x));
+    const ys = [];
+    for (const s of cfg.series) for (const d of datos) { const v = s.y(d); if (valido(v, cfg.logY)) ys.push(+v); }
+    if (cfg.banda) for (const d of datos) ys.push(cfg.banda.y0(d), cfg.banda.y1(d));
+    const y = (cfg.logY ? d3.scaleLog() : d3.scaleLinear()).domain(cfg.dominioY ?? (cfg.logY ? d3.extent(ys) : [0, d3.max(ys)]));
+    if (!cfg.logY && !cfg.dominioY) y.nice();
+    const valoresY = cfg.valoresY ? cfg.valoresY(y.domain()) : y.ticks(5);
+    const formatoY = cfg.formatoY ?? F.int;
+    const conRotulos = (cfg.bandas ?? []).length > 0 || (cfg.refsX ?? []).some((r) => r.etiqueta);
+    const m = { t: conRotulos ? 22 : 10, b: 26, l: medir(svg, valoresY.map(formatoY)) + 12, r: 14 };
+    const finales = cfg.etiquetasFinales
+      ? cfg.series.map((s) => ({ s, d: [...datos].reverse().find((r) => valido(s.y(r), cfg.logY)) })).filter((e) => e.d)
+      : [];
+    if (finales.length) m.r = medir(svg, finales.map((e) => e.s.nombre)) + 14;
+    x.range([m.l, ancho - m.r]);
+    y.range([alto - m.b, m.t]);
+    const g = svg.append('g');
+
+    const zonas = (cfg.bandas ?? []).map((b) => ({ ...b, xa: Math.max(m.l, x(b.x0)), xb: Math.min(ancho - m.r, x(b.x1)) })).filter((b) => b.xb > b.xa);
+    for (const b of zonas) {
+      g.append('rect').attr('x', b.xa).attr('y', m.t).attr('width', b.xb - b.xa).attr('height', alto - m.t - m.b)
+        .style('fill', 'var(--color-fg)').style('opacity', b.opacidad);
+    }
+    if (zonas.length) {
+      const caben = zonas.every((b) => b.xb - b.xa >= medir(svg, [b.etiqueta]) + 6);
+      if (caben) {
+        for (const b of zonas) g.append('text').attr('class', 'eda-txt').attr('x', b.xa + 3).attr('y', m.t - 7).text(b.etiqueta);
+      } else {
+        g.append('text').attr('class', 'eda-txt').attr('x', zonas[0].xa - 4).attr('y', m.t - 7).attr('text-anchor', 'end').text('validación y test');
+      }
+    }
+
+    ejes(g, x, y, { ancho, alto, m, valoresY, valoresX: cfg.valoresX ? cfg.valoresX(x.domain()) : null, formatoX: cfg.formatoX, formatoY });
+
+    for (const r of cfg.refsX ?? []) {
+      g.append('line').attr('x1', x(r.x)).attr('x2', x(r.x)).attr('y1', m.t).attr('y2', alto - m.b)
+        .style('stroke', 'var(--cds-chart-reference)').style('stroke-width', 1).style('stroke-dasharray', '3 3');
+      if (r.etiqueta) g.append('text').attr('class', 'eda-txt').attr('x', x(r.x) + 4).attr('y', m.t - 7).text(r.etiqueta);
+    }
+
+    if (cfg.banda) {
+      g.append('path').datum(datos)
+        .attr('d', d3.area().x((d) => x(cfg.x(d))).y0((d) => y(cfg.banda.y0(d))).y1((d) => y(cfg.banda.y1(d))))
+        .style('fill', cfg.banda.color).style('opacity', 0.22).style('stroke', 'none');
+    }
+    for (const s of cfg.series) {
+      const linea = d3.line().defined((d) => valido(s.y(d), cfg.logY)).x((d) => x(cfg.x(d))).y((d) => y(s.y(d)));
+      g.append('path').datum(datos).attr('d', linea)
+        .style('fill', 'none').style('stroke', s.color).style('stroke-width', s.ancho ?? 2)
+        .style('stroke-linejoin', 'round').style('stroke-linecap', s.discontinua ? 'butt' : 'round')
+        .style('stroke-dasharray', s.discontinua ? '5 4' : null);
+    }
+
+    if (finales.length) {
+      const pos = finales.map((e) => ({ ...e, yy: y(e.s.y(e.d)) })).sort((a, b) => a.yy - b.yy);
+      for (let i = 1; i < pos.length; i++) if (pos[i].yy - pos[i - 1].yy < 13) pos[i].yy = pos[i - 1].yy + 13;
+      for (const p of pos) {
+        g.append('text').attr('class', 'eda-txt').attr('x', x(cfg.x(p.d)) + 6).attr('y', p.yy).attr('dy', '0.35em')
+          .style('fill', p.s.color).text(p.s.nombre);
+      }
+    }
+
+    const foco = g.append('g').style('display', 'none').style('pointer-events', 'none');
+    const regla = foco.append('line').attr('y1', m.t).attr('y2', alto - m.b).style('stroke', 'var(--cds-chart-reference)').style('stroke-width', 1);
+    const puntos = cfg.series.map((s) => foco.append('circle').attr('r', 3.5)
+      .style('fill', s.color).style('stroke', 'var(--color-panel)').style('stroke-width', 1.5));
+    const tip = tooltip(el);
+    const cerca = d3.bisector(cfg.x).center;
+    svg.append('rect').attr('x', m.l).attr('y', m.t).attr('width', ancho - m.l - m.r).attr('height', alto - m.t - m.b)
+      .style('fill', 'transparent').style('cursor', 'crosshair')
+      .on('pointermove', (ev) => {
+        const [px] = d3.pointer(ev);
+        const d = datos[cerca(datos, x.invert(px))];
+        if (!d) return;
+        const cx = x(cfg.x(d));
+        foco.style('display', null);
+        regla.attr('x1', cx).attr('x2', cx);
+        cfg.series.forEach((s, i) => {
+          const v = s.y(d);
+          const ok = valido(v, cfg.logY);
+          puntos[i].style('display', ok ? null : 'none');
+          if (ok) puntos[i].attr('cx', cx).attr('cy', y(v));
+        });
+        const t = cfg.tooltip(d);
+        tip.mostrar(cx, t.titulo, t.renglones);
+      })
+      .on('pointerleave', () => { foco.style('display', 'none'); tip.ocultar(); });
+  }
+
+  function zonasParticion(datos) {
+    const zonas = [];
+    for (const [particion, opacidad] of [['validación', 0.06], ['test', 0.12]]) {
+      const r = datos.filter((d) => d.particion === particion);
+      if (r.length) zonas.push({ x0: r[0].f, x1: d3.utcDay.offset(r[r.length - 1].f, 7), opacidad, etiqueta: particion });
+    }
+    return zonas;
+  }
+
+  // ---------------------------------------------------------------- E1 · actividad semanal
+  const e1 = { vista: 'ratings', desde: 'todo' };
+  function leyendaE1() {
+    const ley = document.getElementById('ley-e1');
+    const items = e1.vista === 'ratings' ? [['Ratings por semana', C[0]]] : [['Regresan (ya tienen historia)', C[0]], ['Nuevos (semana de alta)', C[1]]];
+    ley.replaceChildren(...items.map(([nombre, color]) => {
+      const it = document.createElement('span'); it.className = 'it';
+      const sw = document.createElement('span'); sw.className = 'eda-sw linea'; sw.style.borderTopColor = color;
+      it.append(sw, nombre);
+      return it;
+    }));
+  }
+  function dibujarSemanal() {
+    const el = document.getElementById('g-semanal');
+    leyendaE1();
+    if (!listo(el, ['semanal'])) return;
+    let datos = fechadas(filas('semanal'));
+    if (e1.desde === '2015') datos = datos.filter((d) => d.f >= new Date('2015-01-01T00:00:00Z'));
+    const ancho = e1.desde === '2015' ? 1.6 : 1.1;
+    const series = e1.vista === 'ratings'
+      ? [{ nombre: 'Ratings', y: (d) => d.ratings, color: C[0], ancho }]
+      : [{ nombre: 'Regresan', y: (d) => d.usuarios_que_regresan, color: C[0], ancho }, { nombre: 'Nuevos', y: (d) => d.usuarios_nuevos, color: C[1], ancho }];
+    lineas(el, {
+      filas: datos, x: (d) => d.f, tiempo: true, alto: 260, series, bandas: zonasParticion(datos),
+      formatoX: año, formatoY: F.int,
+      tooltip: (d) => ({ titulo: `Semana del ${fechaLarga(d.f)} · ${d.particion}`, renglones: series.map((s) => ({ nombre: s.nombre, color: series.length > 1 ? s.color : null, valor: F.int(s.y(d)) })) }),
+    });
+  }
+
+  // ---------------------------------------------------------------- S · escala del rating
+  function dibujarEscala() {
+    const el = document.getElementById('g-escala');
+    if (!listo(el, ['ratings_valor'])) return;
+    const datos = filas('ratings_valor');
+    const alto = 240;
+    const { svg, ancho } = lienzo(el, alto);
+    const grupos = [{ campo: 'hasta_2002', nombre: 'Hasta 2002', color: MUTED }, { campo: 'desde_2016', nombre: 'Desde 2016', color: C[0] }];
+    const y = d3.scaleLinear().domain([0, d3.max(datos, (d) => Math.max(d.hasta_2002, d.desde_2016))]).nice();
+    const valoresY = y.ticks(4);
+    const m = { t: 10, b: 26, l: medir(svg, valoresY.map(F.pct0)) + 12, r: 8 };
+    y.range([alto - m.b, m.t]);
+    const x0 = d3.scaleBand().domain(datos.map((d) => String(d.rating))).range([m.l, ancho - m.r]).paddingInner(0.25).paddingOuter(0.1);
+    const x1 = d3.scaleBand().domain(grupos.map((gr) => gr.campo)).range([0, x0.bandwidth()]).padding(0.1);
+    const barra = Math.min(x1.bandwidth(), 32);
+    const g = svg.append('g');
+    ejes(g, x0, y, { ancho, alto, m, valoresY, formatoX: (v) => v, formatoY: F.pct0 });
+    for (const gr of grupos) {
+      g.selectAll(null).data(datos).join('rect')
+        .attr('x', (d) => x0(String(d.rating)) + x1(gr.campo) + (x1.bandwidth() - barra) / 2).attr('width', barra)
+        .attr('y', (d) => y(d[gr.campo])).attr('height', (d) => y(0) - y(d[gr.campo])).attr('rx', 3)
+        .style('fill', gr.color);
+    }
+    const tip = tooltip(el);
+    g.selectAll(null).data(datos).join('rect')
+      .attr('x', (d) => x0(String(d.rating))).attr('width', x0.bandwidth()).attr('y', m.t).attr('height', alto - m.t - m.b)
+      .style('fill', 'transparent')
+      .on('pointerenter', (ev, d) => tip.mostrar(x0(String(d.rating)) + x0.bandwidth() / 2, `Rating ${d.rating}`,
+        grupos.map((gr) => ({ nombre: gr.nombre, color: gr.color, valor: F.pct1(d[gr.campo]) }))))
+      .on('pointerleave', () => tip.ocultar());
+  }
+
+  // ---------------------------------------------------------------- E2 · composición anual
+  function dibujarAnual() {
+    const el = document.getElementById('g-anual');
+    if (!listo(el, ['anual'])) return;
+    const datos = filas('anual').filter((d) => d.año >= 1996);
+    const series = [
+      { nombre: 'Usuario nuevo', y: (d) => d.pct_usuario_nuevo, color: C[1] },
+      { nombre: 'Ambos conocidos', y: (d) => d.pct_ambos_conocidos, color: C[0] },
+      { nombre: 'Película nueva', y: (d) => d.pct_pelicula_nueva, color: C[2] },
+    ];
+    lineas(el, {
+      filas: datos, x: (d) => d.año, alto: 240, dominioY: [0, 1], series, etiquetasFinales: true,
+      formatoX: d3.format('d'), formatoY: F.pct0,
+      tooltip: (d) => ({ titulo: String(d.año), renglones: [...series.map((s) => ({ nombre: s.nombre, color: s.color, valor: F.pct1(s.y(d)) })), { nombre: 'Ratings del año', valor: F.int(d.ratings) }] }),
+    });
+  }
+
+  // ---------------------------------------------------------------- E3 · persistencia
+  function dibujarPersistencia() {
+    const el = document.getElementById('g-persistencia');
+    if (!listo(el, ['persistencia'])) return;
+    const datos = fechadas(filas('persistencia'));
+    const series = [
+      { nombre: 'Semana anterior', y: (d) => d.reciente, color: C[0], ancho: 1.6 },
+      { nombre: 'Histórico', y: (d) => d.historico, color: C[1], ancho: 1.6 },
+    ];
+    lineas(el, {
+      filas: datos, x: (d) => d.f, tiempo: true, alto: 260, series, bandas: zonasParticion(datos),
+      formatoX: año, formatoY: F.pct0,
+      tooltip: (d) => ({ titulo: `Semana del ${fechaLarga(d.f)} · ${d.particion}`, renglones: series.map((s) => ({ nombre: 'Top 20 ' + s.nombre.toLowerCase(), color: s.color, valor: F.pct1(s.y(d)) })) }),
+    });
+  }
+
+  // ---------------------------------------------------------------- E4 · películas nuevas
+  function dibujarAcumulado() {
+    const el = document.getElementById('g-acumulado');
+    if (!listo(el, ['acumulado'])) return;
+    const datos = filas('acumulado');
+    lineas(el, {
+      filas: datos, x: (d) => d.semana, alto: 240, logY: true, dominioY: [1, d3.max(datos, (d) => d.p90) * 1.15],
+      banda: { y0: (d) => d.p25, y1: (d) => d.p75, color: C[0] },
+      series: [{ nombre: 'Mediana', y: (d) => d.p50, color: C[0] }, { nombre: 'Percentil 90', y: (d) => d.p90, color: C[0], discontinua: true }],
+      valoresY: escalones, formatoY: F.int, formatoX: d3.format('d'),
+      tooltip: (d) => ({
+        titulo: `Semana ${d.semana} desde la primera aparición`,
+        renglones: [['Percentil 25', d.p25], ['Mediana', d.p50], ['Percentil 75', d.p75], ['Percentil 90', d.p90], ['Percentil 99', d.p99]].map(([nombre, v]) => ({ nombre, valor: F.int(v) })),
+      }),
+    });
+  }
+
+  // ---------------------------------------------------------------- E5 · géneros
+  function dibujarGeneros() {
+    const el = document.getElementById('g-generos');
+    if (!listo(el, ['generos'])) return;
+    const datos = [...filas('generos')].sort((a, b) => b.peliculas - a.peliculas);
+    const alto = datos.length * 20 + 8;
+    const { svg, ancho } = lienzo(el, alto);
+    const m = { t: 4, b: 4, l: medir(svg, datos.map((d) => d.genero)) + 10, r: medir(svg, datos.map((d) => F.int(d.peliculas))) + 10 };
+    const y = d3.scaleBand().domain(datos.map((d) => d.genero)).range([m.t, alto - m.b]).padding(0.25);
+    const x = d3.scaleLinear().domain([0, d3.max(datos, (d) => d.peliculas)]).range([m.l, ancho - m.r]);
+    const g = svg.append('g');
+    g.selectAll(null).data(datos).join('text').attr('class', 'eda-txt')
+      .attr('x', m.l - 8).attr('y', (d) => y(d.genero) + y.bandwidth() / 2).attr('dy', '0.35em').attr('text-anchor', 'end').text((d) => d.genero);
+    g.selectAll(null).data(datos).join('rect')
+      .attr('x', m.l).attr('y', (d) => y(d.genero)).attr('height', y.bandwidth()).attr('width', (d) => Math.max(0, x(d.peliculas) - m.l)).attr('rx', 3)
+      .style('fill', (d) => (d.genero === 'Sin género' ? MUTED : C[0]));
+    g.selectAll(null).data(datos).join('text').attr('class', 'eda-txt')
+      .attr('x', (d) => x(d.peliculas) + 6).attr('y', (d) => y(d.genero) + y.bandwidth() / 2).attr('dy', '0.35em').text((d) => F.int(d.peliculas));
+  }
+
+  // ---------------------------------------------------------------- M1 · CCDF y ley de potencia
+  function dibujarCcdf(nodo, idEl) {
+    const el = document.getElementById(idEl);
+    if (!listo(el, ['ccdf', 'ley_potencia'])) return;
+    const datos = filas('ccdf').filter((d) => d.nodo === nodo);
+    const ley = filas('ley_potencia').find((d) => d.nodo === nodo);
+    if (!datos.length || !ley) return;
+    const series = [
+      { nombre: 'Empírica', y: (d) => d.ccdf, color: C[0] },
+      { nombre: 'Ley de potencia', y: (d) => d.ajuste, color: C[1], discontinua: true },
+    ];
+    lineas(el, {
+      filas: datos, x: (d) => d.k, logX: true, logY: true, alto: 260, series,
+      refsX: [{ x: ley.x_min, etiqueta: 'x_min' }],
+      valoresX: potencias, valoresY: potencias, formatoX: F.compact, formatoY: potencia,
+      tooltip: (d) => ({
+        titulo: `${F.int(d.k)} ratings o más`,
+        renglones: series.filter((s) => valido(s.y(d), true)).map((s) => ({ nombre: s.nombre, color: s.color, valor: pctPequeño(s.y(d)) })),
+      }),
+    });
+  }
+
+  // ---------------------------------------------------------------- M2 · deriva (distribución acumulada por año)
+  let m2 = 0;
+  function dibujarDeriva() {
+    const el = document.getElementById('g-deriva');
+    if (!listo(el, ['deriva_cuantiles'])) return;
+    const datos = filas('deriva_cuantiles').filter((d) => d.variable === VARIABLES[m2]);
+    const años = [{ año: 2021, color: MUTED }, { año: 2022, color: C[0] }, { año: 2023, color: C[1] }];
+    for (const a of años) a.filas = datos.filter((d) => d.año === a.año).sort((p, q) => p.p - q.p);
+    const alto = 260;
+    const { svg, ancho } = lienzo(el, alto);
+    const x = d3.scaleLog().domain(d3.extent(datos, (d) => Math.max(1, d.valor)));
+    const y = d3.scaleLinear().domain([0, 1]);
+    const valoresY = [0, 0.25, 0.5, 0.75, 1];
+    const m = { t: 10, b: 26, l: medir(svg, valoresY.map(F.pct0)) + 12, r: 14 };
+    x.range([m.l, ancho - m.r]);
+    y.range([alto - m.b, m.t]);
+    const g = svg.append('g');
+    ejes(g, x, y, { ancho, alto, m, valoresY, valoresX: potencias(x.domain()), formatoX: F.compact, formatoY: F.pct0 });
+    for (const a of años) {
+      g.append('path').datum(a.filas)
+        .attr('d', d3.line().x((d) => x(Math.max(1, d.valor))).y((d) => y(d.p)))
+        .style('fill', 'none').style('stroke', a.color).style('stroke-width', 2).style('stroke-linejoin', 'round').style('stroke-linecap', 'round');
+    }
+    const foco = g.append('g').style('display', 'none').style('pointer-events', 'none');
+    const regla = foco.append('line').attr('x1', m.l).attr('x2', ancho - m.r).style('stroke', 'var(--cds-chart-reference)').style('stroke-width', 1);
+    const puntos = años.map((a) => foco.append('circle').attr('r', 3.5).style('fill', a.color).style('stroke', 'var(--color-panel)').style('stroke-width', 1.5));
+    const tip = tooltip(el);
+    svg.append('rect').attr('x', m.l).attr('y', m.t).attr('width', ancho - m.l - m.r).attr('height', alto - m.t - m.b)
+      .style('fill', 'transparent').style('cursor', 'crosshair')
+      .on('pointermove', (ev) => {
+        const [px, py] = d3.pointer(ev);
+        const i = Math.max(0, Math.min(100, Math.round(y.invert(py) * 100)));
+        const fila = años.map((a) => a.filas[i]);
+        if (fila.some((f) => !f)) return;
+        foco.style('display', null);
+        regla.attr('y1', y(fila[0].p)).attr('y2', y(fila[0].p));
+        fila.forEach((f, j) => puntos[j].attr('cx', x(Math.max(1, f.valor))).attr('cy', y(f.p)));
+        tip.mostrar(px, `Percentil ${i}`, años.map((a, j) => ({ nombre: String(a.año), color: a.color, valor: F.int(fila[j].valor) })));
+      })
+      .on('pointerleave', () => { foco.style('display', 'none'); tip.ocultar(); });
+  }
+
+  // ---------------------------------------------------------------- controles y navegación
+  const pulsar = (grupo, boton) => grupo.forEach((b) => b.setAttribute('aria-pressed', String(b === boton)));
+  const botonesVista = [...document.querySelectorAll('.eda [data-vista]')];
+  const botonesDesde = [...document.querySelectorAll('.eda [data-desde]')];
+  const botonesVariable = [...document.querySelectorAll('.eda [data-variable]')];
+  botonesVista.forEach((b) => b.addEventListener('click', () => { e1.vista = b.dataset.vista; pulsar(botonesVista, b); seguro(dibujarSemanal); }));
+  botonesDesde.forEach((b) => b.addEventListener('click', () => { e1.desde = b.dataset.desde; pulsar(botonesDesde, b); seguro(dibujarSemanal); }));
+  botonesVariable.forEach((b) => b.addEventListener('click', () => { m2 = Number(b.dataset.variable); pulsar(botonesVariable, b); seguro(dibujarDeriva); }));
+
+  document.querySelectorAll('.eda [data-color]').forEach((s) => {
+    const color = s.dataset.color === 'muted' ? MUTED : C[Number(s.dataset.color)];
+    if (s.classList.contains('linea')) s.style.borderTopColor = color; else s.style.background = color;
+    if (s.dataset.opacidad) s.style.opacity = s.dataset.opacidad;
+  });
+
+  const reducido = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const ir = (id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: reducido ? 'auto' : 'smooth', block: 'start' });
+    dash.setLink(id);
+  };
+  document.querySelectorAll('.eda [data-ir]').forEach((b) => b.addEventListener('click', () => ir(b.dataset.ir)));
+
+  // Un gráfico que falla no debe impedir que se dibujen los demás; el error se reporta igual
+  function seguro(fn, ...args) {
+    try { fn(...args); } catch (error) { setTimeout(() => { throw error; }); }
+  }
+
+  let enlaceAbierto = false;
+  dash.onData(() => {
+    seguro(llenarMarcas);
+    document.querySelectorAll('.eda table[data-source]').forEach((t) => seguro(llenarTabla, t));
+    seguro(dibujarEscala);
+    seguro(dibujarSemanal);
+    seguro(dibujarAnual);
+    seguro(dibujarPersistencia);
+    seguro(dibujarAcumulado);
+    seguro(dibujarGeneros);
+    seguro(dibujarCcdf, 'usuarios', 'g-ccdf-usuarios');
+    seguro(dibujarCcdf, 'películas', 'g-ccdf-peliculas');
+    seguro(dibujarDeriva);
+    if (!enlaceAbierto && filas('semanal')) {
+      enlaceAbierto = true;
+      const nombrado = location.hash.length > 1 ? document.getElementById(location.hash.slice(1)) : null;
+      if (nombrado) nombrado.scrollIntoView();
+    }
+  });
+})();
+</script>

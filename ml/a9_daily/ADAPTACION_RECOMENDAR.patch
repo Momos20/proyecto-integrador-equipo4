@@ -1,0 +1,11 @@
+--- A9_topk_diario/src/recomendar.py (Miguel)
++++ ml/a9_daily/src/recomendar.py (CineGraph)
+@@ -47 +47 @@
+-CARPETA_A9 = datos.RAIZ / "resultados" / "graphsage" / "A9_sin_id"
++CARPETA_A9 = datos.RAIZ.parent / "models" / "A9_sin_id"
+@@ -62 +62 @@
+-    modelo.load_state_dict(torch.load(carpeta / "modelo.pt", map_location=diario.dispositivo))
++    modelo.load_state_dict(torch.load(carpeta / "modelo.pt", map_location=diario.dispositivo, weights_only=True))
+@@ -154 +154 @@
+-        contenido = {"modelo": "GraphSAGE A9 (sin embeddings de ID)", "pesos": (CARPETA_A9 / "modelo.pt").relative_to(datos.RAIZ).as_posix(),
++        contenido = {"modelo": "GraphSAGE A9 (sin embeddings de ID)", "pesos": (CARPETA_A9 / "modelo.pt").relative_to(datos.RAIZ.parent.parent).as_posix(),

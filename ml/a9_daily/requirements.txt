@@ -1,0 +1,8 @@
+pandas>=2.1
+pyarrow>=14
+matplotlib>=3.7
+scipy>=1.11
+jupyter
+torch>=2.4
+torch_geometric>=2.6
+# Opcional, para el muestreo de vecindario (ver README): pyg_lib

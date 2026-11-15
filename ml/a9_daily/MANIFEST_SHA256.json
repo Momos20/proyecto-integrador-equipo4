@@ -1,0 +1,273 @@
+{
+  "fuente": "A9_topk_diario(1).zip (entregado por el usuario, implementación de Miguel)",
+  "destino": "ml/a9_daily/",
+  "modelo_canonico_git": "ml/models/A9_sin_id/modelo.pt",
+  "modelo_sha256_esperado": "8c9aa61fb7e8d3ed3a6476fe759f9861283387bc6561ea5aa03595ab516a2358",
+  "modelo_copiado_en_este_paquete": false,
+  "protocol": "horizonte diario UTC, sin modificar",
+  "archivos_originales_importados": 37,
+  "modificaciones": {
+    "src/recomendar.py": "3 sustituciones de rutas/carga segura, algoritmo original intacto"
+  },
+  "archivos": [
+    {
+      "ruta": "LEEME.md",
+      "sha256_miguel": "2003ee6997f6c153ada033910ad9d55f3bdac4c5e2cadb6d87ca46416579f662",
+      "sha256_cinegraph": "2003ee6997f6c153ada033910ad9d55f3bdac4c5e2cadb6d87ca46416579f662",
+      "identico": true,
+      "bytes": 4685
+    },
+    {
+      "ruta": "README.md",
+      "sha256_miguel": "c6035db9c0e4b00da80d0d29a092a7c2ba02bd179bf523b7d463023ac930a00d",
+      "sha256_cinegraph": "c6035db9c0e4b00da80d0d29a092a7c2ba02bd179bf523b7d463023ac930a00d",
+      "identico": true,
+      "bytes": 24022
+    },
+    {
+      "ruta": "requirements.txt",
+      "sha256_miguel": "1ca70ce4efd77712284bb1539480d8db9924bcb6501d72b24a1cdf5ee3ee051b",
+      "sha256_cinegraph": "1ca70ce4efd77712284bb1539480d8db9924bcb6501d72b24a1cdf5ee3ee051b",
+      "identico": true,
+      "bytes": 157
+    },
+    {
+      "ruta": "resultados/diario/registro_validacion.txt",
+      "sha256_miguel": "cfa104992960cc6f69b8732f7284f86a239bff3eca6761b33bfa6d69899dc690",
+      "sha256_cinegraph": "cfa104992960cc6f69b8732f7284f86a239bff3eca6761b33bfa6d69899dc690",
+      "identico": true,
+      "bytes": 3395
+    },
+    {
+      "ruta": "resultados/diario/validacion_comparacion.csv",
+      "sha256_miguel": "8581867e38875da67c4d841d3211c05cf7ecacc8bab7f302bdc28904ecb38775",
+      "sha256_cinegraph": "8581867e38875da67c4d841d3211c05cf7ecacc8bab7f302bdc28904ecb38775",
+      "identico": true,
+      "bytes": 2600
+    },
+    {
+      "ruta": "resultados/diario/validacion_resumen.csv",
+      "sha256_miguel": "0ecc3123b4d1d8aede42ee97d65c92cc759806696f5ec48607741ff12ffb7ca0",
+      "sha256_cinegraph": "0ecc3123b4d1d8aede42ee97d65c92cc759806696f5ec48607741ff12ffb7ca0",
+      "identico": true,
+      "bytes": 2449
+    },
+    {
+      "ruta": "resultados/recomendaciones/ejemplo_top10_2022-06.json",
+      "sha256_miguel": "ebedde65caa6239cd9713232b3f892579b2145d2ed031148b7e2226578f37a2c",
+      "sha256_cinegraph": "ebedde65caa6239cd9713232b3f892579b2145d2ed031148b7e2226578f37a2c",
+      "identico": true,
+      "bytes": 815682
+    },
+    {
+      "ruta": "src/__init__.py",
+      "sha256_miguel": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256_cinegraph": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "identico": true,
+      "bytes": 0
+    },
+    {
+      "ruta": "src/ablacion.py",
+      "sha256_miguel": "82f8bbbafc2411a2610e7b1c552c171568a6c6eb9e94138b8181ec31c5bad40a",
+      "sha256_cinegraph": "82f8bbbafc2411a2610e7b1c552c171568a6c6eb9e94138b8181ec31c5bad40a",
+      "identico": true,
+      "bytes": 3240
+    },
+    {
+      "ruta": "src/comparadores.py",
+      "sha256_miguel": "7645f15ddc4f7519688b31c1996068486310049ef842d4e0765c2431584b19be",
+      "sha256_cinegraph": "7645f15ddc4f7519688b31c1996068486310049ef842d4e0765c2431584b19be",
+      "identico": true,
+      "bytes": 20881
+    },
+    {
+      "ruta": "src/contenido.py",
+      "sha256_miguel": "e46a2aa2e92cef19310f13956d30b1d83800c7a3d27e9c678a2d3bb613b117f0",
+      "sha256_cinegraph": "e46a2aa2e92cef19310f13956d30b1d83800c7a3d27e9c678a2d3bb613b117f0",
+      "identico": true,
+      "bytes": 6059
+    },
+    {
+      "ruta": "src/dashboard.html",
+      "sha256_miguel": "e81c421536d593798b2343dd91dcebb72e7ede06bed4255d012092a9778b3531",
+      "sha256_cinegraph": "e81c421536d593798b2343dd91dcebb72e7ede06bed4255d012092a9778b3531",
+      "identico": true,
+      "bytes": 62692
+    },
+    {
+      "ruta": "src/dashboard.py",
+      "sha256_miguel": "fbe24f3f9c7f7411914d55bad7f0fe841a656085432f1e8f459d37342d6059ce",
+      "sha256_cinegraph": "fbe24f3f9c7f7411914d55bad7f0fe841a656085432f1e8f459d37342d6059ce",
+      "identico": true,
+      "bytes": 29058
+    },
+    {
+      "ruta": "src/datos.py",
+      "sha256_miguel": "8339e4314e7d661ef4fbc31ab9f63919a0d56ee7147cf9670c11103db6b455e0",
+      "sha256_cinegraph": "8339e4314e7d661ef4fbc31ab9f63919a0d56ee7147cf9670c11103db6b455e0",
+      "identico": true,
+      "bytes": 2500
+    },
+    {
+      "ruta": "src/diario.py",
+      "sha256_miguel": "cc2e0d42aeed40e33d048617ef7ce1d6772c6595129146be3845441dc09b721d",
+      "sha256_cinegraph": "cc2e0d42aeed40e33d048617ef7ce1d6772c6595129146be3845441dc09b721d",
+      "identico": true,
+      "bytes": 13733
+    },
+    {
+      "ruta": "src/embeddings.py",
+      "sha256_miguel": "0c93bffde854b09acd191ab8e64e9eeacbbfbd79833ff73b2bf0716363589346",
+      "sha256_cinegraph": "0c93bffde854b09acd191ab8e64e9eeacbbfbd79833ff73b2bf0716363589346",
+      "identico": true,
+      "bytes": 2820
+    },
+    {
+      "ruta": "src/entrenamiento.py",
+      "sha256_miguel": "62ebd20aefe1f7485e4184e2bcff436f510d1ccdd65f2c6d070c2e7ef947d1a0",
+      "sha256_cinegraph": "62ebd20aefe1f7485e4184e2bcff436f510d1ccdd65f2c6d070c2e7ef947d1a0",
+      "identico": true,
+      "bytes": 15356
+    },
+    {
+      "ruta": "src/estadistica.py",
+      "sha256_miguel": "0b6363e47b32ec6450541bb2837fe70f53d4dd1141cd3eed40d2702a007bd7c2",
+      "sha256_cinegraph": "0b6363e47b32ec6450541bb2837fe70f53d4dd1141cd3eed40d2702a007bd7c2",
+      "identico": true,
+      "bytes": 8682
+    },
+    {
+      "ruta": "src/evaluacion.py",
+      "sha256_miguel": "f314b67c21d1df3c4f6a298a121cb88e532ff18d38b74f47114a4fab6211ca37",
+      "sha256_cinegraph": "f314b67c21d1df3c4f6a298a121cb88e532ff18d38b74f47114a4fab6211ca37",
+      "identico": true,
+      "bytes": 7994
+    },
+    {
+      "ruta": "src/experimento.py",
+      "sha256_miguel": "280a83044f443ac99c161415b5d8a12b12da8b79fc6d12c2614ec5fb9507593e",
+      "sha256_cinegraph": "280a83044f443ac99c161415b5d8a12b12da8b79fc6d12c2614ec5fb9507593e",
+      "identico": true,
+      "bytes": 8148
+    },
+    {
+      "ruta": "src/frio.py",
+      "sha256_miguel": "58fe639f5c2d667dbc3a3aba64dc1d3b3a572c274d42c3bee4b4c62bbe092299",
+      "sha256_cinegraph": "58fe639f5c2d667dbc3a3aba64dc1d3b3a572c274d42c3bee4b4c62bbe092299",
+      "identico": true,
+      "bytes": 4734
+    },
+    {
+      "ruta": "src/grafo.py",
+      "sha256_miguel": "e22a24a94d7cee27f5d3cb4e66d77ab3108edebd7fdde54212951ce3b43ca044",
+      "sha256_cinegraph": "e22a24a94d7cee27f5d3cb4e66d77ab3108edebd7fdde54212951ce3b43ca044",
+      "identico": true,
+      "bytes": 7086
+    },
+    {
+      "ruta": "src/h2.py",
+      "sha256_miguel": "b1d29e851a2077b32279e9463b00f3bd8f5586a0ae803bb791b3b54827ba5ac8",
+      "sha256_cinegraph": "b1d29e851a2077b32279e9463b00f3bd8f5586a0ae803bb791b3b54827ba5ac8",
+      "identico": true,
+      "bytes": 13635
+    },
+    {
+      "ruta": "src/h3.py",
+      "sha256_miguel": "8c1b20fc029c3d26ec53758202342a8e052fc7cb1411b032873006e5cce26759",
+      "sha256_cinegraph": "8c1b20fc029c3d26ec53758202342a8e052fc7cb1411b032873006e5cce26759",
+      "identico": true,
+      "bytes": 6809
+    },
+    {
+      "ruta": "src/hipotesis.py",
+      "sha256_miguel": "470337be10a2f34a38a2de865c27478506552ef44204cd8f7ec06f4f93a362cd",
+      "sha256_cinegraph": "470337be10a2f34a38a2de865c27478506552ef44204cd8f7ec06f4f93a362cd",
+      "identico": true,
+      "bytes": 2923
+    },
+    {
+      "ruta": "src/lineas_base.py",
+      "sha256_miguel": "7993451fe8d52a104c45fc0661ae4660eac457a843243f57a62621f9e87b82ee",
+      "sha256_cinegraph": "7993451fe8d52a104c45fc0661ae4660eac457a843243f57a62621f9e87b82ee",
+      "identico": true,
+      "bytes": 19313
+    },
+    {
+      "ruta": "src/modelo.py",
+      "sha256_miguel": "5168a9df915ddbf79a541f0e6199cf72e3853f972343f47e97d2c5c1d512c7ae",
+      "sha256_cinegraph": "5168a9df915ddbf79a541f0e6199cf72e3853f972343f47e97d2c5c1d512c7ae",
+      "identico": true,
+      "bytes": 7466
+    },
+    {
+      "ruta": "src/protocolo.py",
+      "sha256_miguel": "d4b7d2792d9efac07fb9ed5094d4111f6ff97a6ac7795b10b292b455cf70e541",
+      "sha256_cinegraph": "d4b7d2792d9efac07fb9ed5094d4111f6ff97a6ac7795b10b292b455cf70e541",
+      "identico": true,
+      "bytes": 7830
+    },
+    {
+      "ruta": "src/recomendar.py",
+      "sha256_miguel": "dc12c0e905bc7f534c07749134d3023ca88e7298757912a164cde8374b455f31",
+      "sha256_cinegraph": "5c1c3bea912ae90c221542964eeaaf675fcce52959ec1981b73c8d04927843be",
+      "identico": false,
+      "bytes": 10733
+    },
+    {
+      "ruta": "src/resultados_a9.html",
+      "sha256_miguel": "24bb5af9809c7c22ca3f6fd1954a78763e03af2c3faf9f3ec1961505a471be9d",
+      "sha256_cinegraph": "24bb5af9809c7c22ca3f6fd1954a78763e03af2c3faf9f3ec1961505a471be9d",
+      "identico": true,
+      "bytes": 30613
+    },
+    {
+      "ruta": "src/resultados_a9.py",
+      "sha256_miguel": "71ea92b4217dba2070971d1d9e5106e4c89f1bbee7bd88ebe1d9e17896c7335e",
+      "sha256_cinegraph": "71ea92b4217dba2070971d1d9e5106e4c89f1bbee7bd88ebe1d9e17896c7335e",
+      "identico": true,
+      "bytes": 11553
+    },
+    {
+      "ruta": "src/temporal.py",
+      "sha256_miguel": "56929894c0beba32a3569db23d85b955397b2658fe2e70d7d77ba2dd296cff8e",
+      "sha256_cinegraph": "56929894c0beba32a3569db23d85b955397b2658fe2e70d7d77ba2dd296cff8e",
+      "identico": true,
+      "bytes": 7478
+    },
+    {
+      "ruta": "src/tmdb.py",
+      "sha256_miguel": "901f5e396c8f5d44de7604377d94012e923f6249b75c658395f9edac0a680623",
+      "sha256_cinegraph": "901f5e396c8f5d44de7604377d94012e923f6249b75c658395f9edac0a680623",
+      "identico": true,
+      "bytes": 6221
+    },
+    {
+      "ruta": "src/wikipedia.py",
+      "sha256_miguel": "c5c49c416fd244e088811108732bed0e936baf9a4b5dc5815f82ea4fd7acd668",
+      "sha256_cinegraph": "c5c49c416fd244e088811108732bed0e936baf9a4b5dc5815f82ea4fd7acd668",
+      "identico": true,
+      "bytes": 16304
+    },
+    {
+      "ruta": "tests/__init__.py",
+      "sha256_miguel": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256_cinegraph": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "identico": true,
+      "bytes": 0
+    },
+    {
+      "ruta": "tests/test_diario.py",
+      "sha256_miguel": "c44f41dbe60b7e6bb06236e3d8d09a60969c9b04e674a8ebe41d836eeefaa489",
+      "sha256_cinegraph": "c44f41dbe60b7e6bb06236e3d8d09a60969c9b04e674a8ebe41d836eeefaa489",
+      "identico": true,
+      "bytes": 10261
+    },
+    {
+      "ruta": "tests/test_evaluacion.py",
+      "sha256_miguel": "bae8f62800f19e1a14d8a508d847312e55b4515d85b88fb6fbe62ecde0c2443b",
+      "sha256_cinegraph": "bae8f62800f19e1a14d8a508d847312e55b4515d85b88fb6fbe62ecde0c2443b",
+      "identico": true,
+      "bytes": 7968
+    }
+  ]
+}
