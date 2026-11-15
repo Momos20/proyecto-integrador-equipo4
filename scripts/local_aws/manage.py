@@ -11,10 +11,18 @@ import os
 import sys
 import time
 from pathlib import Path
+from urllib.parse import urlsplit
 
 ENDPOINT = os.environ.get("AWS_ENDPOINT_URL", "http://floci:4566")
-if not ENDPOINT.startswith(("http://floci:", "http://localhost:", "http://127.0.0.1:")):
-    raise SystemExit("SAFETY: only localhost or the Docker service 'floci' is allowed as AWS_ENDPOINT_URL")
+parsed_endpoint = urlsplit(ENDPOINT)
+if (
+    parsed_endpoint.scheme != "http"
+    or parsed_endpoint.hostname not in {"floci", "localhost", "127.0.0.1"}
+    or parsed_endpoint.port != 4566
+    or parsed_endpoint.username is not None
+    or parsed_endpoint.password is not None
+):
+    raise SystemExit("SAFETY: only localhost or the Docker service 'floci' on port 4566 is allowed as AWS_ENDPOINT_URL")
 
 REGION = os.environ.get("AWS_REGION", "us-east-1")
 BUCKET = os.environ.get("S3_BUCKET", "cinegraph-local-datalake")
