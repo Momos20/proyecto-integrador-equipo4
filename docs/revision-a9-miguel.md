@@ -4,7 +4,7 @@
 
 ## Qué llega y qué se comprobó
 
-- Código fuente `src/recomendar.py` (carga de A9, scoring de todos los candidatos conocidos y Top-K) y `src/diario.py` (snapshots diarios y validación). El ZIP incluye otros 26 módulos Python y pruebas.
+- Código fuente `src/recomendar.py` (carga de A9, scoring de todos los candidatos conocidos y Top-K) y `src/diario.py` (snapshots diarios y validación). El ZIP incluye 25 archivos Python bajo `src/` en total, además de pruebas.
 - Checkpoint `modelo.pt`, `validacion.json` y `curva.csv` idénticos byte a byte a los ya almacenados en `ml/models/A9_sin_id/`. **No duplicar los pesos**.
 - Checkpoint inspeccionado usando `torch.load(..., weights_only=True)`: `state_dict` con 17 tensores y 1 963 286 elementos; proyecciones de dimensión 64 y dos capas de GraphSAGE; incluye buffer `atributos_pelicula` con forma `(87585,22)`. Nuevos nodos o dimensiones requieren verificar la reconstrucción de buffers/atributos.
 - `resultados/diario/validacion_resumen.csv`: cuatro métodos evaluados durante 362 días de 2022; la tabla coincide con las métricas resumidas en `LEEME.md`. `validacion_comparacion.csv` contiene 12 comparaciones con `significativa=True`, **sin recalcularlas independientemente**.
