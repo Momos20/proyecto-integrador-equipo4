@@ -79,3 +79,6 @@ Para comprobar el recorrido de una interacción del frontend: sigue [`docs/floci
 ## Futuro: AWS Academy
 
 Cuando termine la validación local, se mapeará el almacenamiento emulado a S3 AWS y el cálculo de PyTorch a un entorno de ejecución real. **No hay recursos AWS reales creados ni validados en esta etapa**, y no debe ejecutarse el runner local contra una cuenta AWS.
+## Publicación manual en CineGraph sin simulaciones
+
+El runner ahora anota `predicciones_sha256` en el manifiesto. `a9-publish` lee exclusivamente JSON y manifiesto de A9 bajo S3 Floci, verifica el checksum del resultado, del checkpoint y que se ejecutaron las pruebas originales, y guarda posiciones y scores verdaderos en PostgreSQL. El frontend solo los presenta después de iniciar sesión. Sin resultados A9 publicados, aparece un mensaje de ausencia, nunca una predicción falsa. [Guía](cinegraph-login-real-a9.md).

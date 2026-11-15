@@ -178,6 +178,7 @@ def main(argv=None) -> None:
             "checkpoint_sha256": MODEL_SHA256,
             "ratings_parquet_s3_local": f"s3://{BUCKET}/{uploaded_key}",
             "ratings_sha256": digest,
+            "predicciones_sha256": sha256_file(output),
             "fecha_utc": args.fecha,
             "usuarios": args.usuarios,
             "k": args.k,

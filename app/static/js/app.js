@@ -1,279 +1,194 @@
 "use strict";
 
-// CineGraph UI. Ranking comes only from the API; curated image paths are
-// illustrative fallbacks for the ten demo movies, not model predictions.
-const form = document.getElementById("recommendationForm");
-const userInput = document.getElementById("userId");
-const submitButton = document.getElementById("submitButton");
-const demoButton = document.getElementById("demoButton");
-const emptyDemoButton = document.getElementById("emptyDemoButton");
-const resultsSection = document.getElementById("resultsSection");
-const loadingSection = document.getElementById("loadingSection");
-const emptyState = document.getElementById("emptyState");
-const movieGrid = document.getElementById("movieGrid");
-const toast = document.getElementById("toast");
-const servingNotice = document.getElementById("servingNotice");
-const movieFilter = document.getElementById("movieFilter");
-const visibleCount = document.getElementById("visibleCount");
-
-const DEMO_POSTERS = Object.freeze({
-    2571: "f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg",
-    2959: "pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg",
-    4993: "6oom5QYQ2yQTMJIbnvbkBL9cHo6.jpg",
-    5952: "5VTN0pR8gcqV3EPUHHfMGnJYN9L.jpg",
-    7153: "rCzpDGLbOoPwLjy3OAm5NUPOTrC.jpg",
-    79132: "oYuLEt3zVCKq57qu2F8dT7NIa6f.jpg",
-    58559: "qJ2tW6WMUDux911r6m7haRef0WH.jpg",
-    318: "q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg",
-    356: "arw2vcBveWOVZr6pxd9XTd1TdQa.jpg",
-    296: "d5iIlFn5s0ImszYzBPb8JPIfbXD.jpg",
-});
-
-let activeUserId = null;
-let activeRecommendationContext = null;
-let currentRecommendations = [];
+// CineGraph: películas leídas de PostgreSQL (catálogo verificado MovieLens 32M).
+// Nunca insertamos títulos, pósteres ni rankings de prueba en el cliente.
+const $ = (id) => document.getElementById(id);
+const state = { user: null, csrf: null, catalog: new Map(), ranking: null, busy: false };
+const rails = [
+  { id: "new", title: "Recién llegadas al catálogo", genre: null },
+  { id: "action", title: "Acción y aventura", genre: "Action" },
+  { id: "scifi", title: "Ciencia ficción", genre: "Sci-Fi" },
+  { id: "drama", title: "Historias que emocionan", genre: "Drama" },
+  { id: "comedy", title: "Para reír un rato", genre: "Comedy" },
+];
 let toastTimer;
-
-function escapeHtml(value) {
-    return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+function safe(value) { return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;")
+  .replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;"); }
+function posterUrl(candidate) {
+  if (!candidate || typeof candidate !== "string") return null;
+  try { const u = new URL(candidate); if (u.protocol === "https:" && (u.hostname === "image.tmdb.org" || u.hostname.endsWith(".themoviedb.org"))) return u.href; }
+  catch (_error) { /* La fuente no tiene imagen válida */ }
+  return null;
 }
-
-function safePosterUrl(movie) {
-    const candidate = movie.poster_url;
-    if (typeof candidate === "string") {
-        try {
-            const parsed = new URL(candidate, window.location.href);
-            if (parsed.protocol === "https:" && (parsed.hostname === "image.tmdb.org" ||
-                parsed.hostname.endsWith(".themoviedb.org"))) return parsed.href;
-        } catch (_error) {
-            // Invalid image URLs fall back to curated artwork.
-        }
+function toast(message) { $("toast").textContent = message; $("toast").classList.add("visible");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => $("toast").classList.remove("visible"), 3500); }
+async function request(url, options = {}) {
+  const headers = { Accept: "application/json", ...(options.headers || {}) };
+  if (options.method && options.method !== "GET") headers["X-CSRF-Token"] = state.csrf || "";
+  const response = await fetch(url, { credentials: "same-origin", ...options, headers });
+  const data = await response.json();
+  if (!response.ok) { const error = new Error(data.message || "No se pudo completar la solicitud."); error.status = response.status; throw error; }
+  return data;
+}
+function showLogin() { $("loginModal").hidden = false; document.body.classList.add("modal-open"); $("loginError").hidden = true; $("loginUsername").focus(); }
+function hideLogin() { $("loginModal").hidden = true; document.body.classList.remove("modal-open"); $("loginPassword").value = ""; }
+function renderAuth() {
+  $("openLogin").hidden = Boolean(state.user);
+  $("logoutButton").hidden = !state.user;
+  $("accountName").hidden = !state.user;
+  $("accountName").textContent = state.user ? state.user.username : "";
+  $("heroAccount").textContent = state.user
+    ? `Hola, ${state.user.username}. Tu experiencia está vinculada exclusivamente a tu perfil.`
+    : "Explora el catálogo. Inicia sesión para guardar tus gustos y ver tu selección personal.";
+}
+function movieCard(movie, {rank = false, surface = "catalog"} = {}) {
+  const img = posterUrl(movie.poster_url);
+  const title = safe(movie.title);
+  const genre = safe((movie.genres || []).slice(0, 2).join(" · ") || "Película");
+  const art = img ? `<img src="${safe(img)}" alt="Póster de ${title}" loading="lazy" decoding="async">` : "";
+  return `<article class="movie-card" data-movie-id="${Number(movie.movie_id)}" data-rank="${rank ? Number(movie.rank) : ""}" data-surface="${safe(surface)}">
+    <div class="poster"><div class="poster-fallback" aria-hidden="true"><span>CG</span><strong>${title}</strong></div>${art}
+       ${rank ? `<span class="poster-rank">${Number(movie.rank)}</span>` : ""}
+       <div class="card-hover"><span class="card-hover-title">${title}</span><span class="card-hover-meta">${safe(movie.release_year || "")} · ${genre}</span></div>
+    </div>
+    <div class="movie-info"><h3>${title}</h3><span>${safe(movie.release_year || "")} · ${genre}</span></div>
+    <div class="movie-actions">
+      <button type="button" class="feedback-button" data-action="like" aria-label="Me gusta ${title}">♥ Me gusta</button>
+      <button type="button" class="feedback-button" data-action="watchlist" aria-label="Añadir ${title} a mi lista">＋ Mi lista</button>
+      <label class="rating-control">Calificar <select data-action="rating" aria-label="Calificar ${title}">
+        <option value="">Estrellas</option>${[5,4.5,4,3.5,3,2.5,2,1.5,1,0.5].map(n=>`<option value="${n}">${n} ★</option>`).join("")}
+      </select></label>
+    </div></article>`;
+}
+function makeShelf(key, name, movies) {
+  const section = document.createElement("section");
+  section.className = "catalog-row";
+  section.innerHTML = `<div class="row-heading"><h3>${safe(name)}</h3><div class="row-controls"><button type="button" class="shelf-arrow" data-direction="-1" aria-label="Ver películas anteriores">‹</button><button type="button" class="shelf-arrow" data-direction="1" aria-label="Ver más películas">›</button></div></div><div class="shelf-track" id="rail-${safe(key)}" tabindex="0" aria-label="${safe(name)}">${movies.map(movie=>movieCard(movie)).join("")}</div>`;
+  return section;
+}
+async function loadCatalog() {
+  const container = $("catalogShelves");
+  const results = await Promise.allSettled(rails.map(async (row) => {
+    const query = new URLSearchParams({ limit: "18" });
+    if (row.genre) query.set("genre", row.genre);
+    const data = await request(`/api/catalog?${query}`);
+    if (!data.ready) return {row, ready: false, movies: []};
+    for (const movie of data.movies) state.catalog.set(Number(movie.movie_id), movie);
+    return {row, ready: true, movies: data.movies};
+  }));
+  let loaded = 0; let pendingSetup = false;
+  for (const r of results) {
+    if (r.status !== "fulfilled") continue;
+    const { row, ready, movies } = r.value;
+    if (!ready) { pendingSetup = true; continue; }
+    if (movies.length) { container.appendChild(makeShelf(row.id, row.title, movies)); loaded++; }
+  }
+  $("catalogStatus").hidden = loaded > 0;
+  if (!loaded) $("catalogStatus").textContent = pendingSetup
+    ? "El catálogo verificado de MovieLens todavía no se ha importado. Ejecuta el bootstrap local indicado en la guía del proyecto."
+    : "No fue posible cargar el catálogo. Revisa la base de datos.";
+}
+async function loadRecommendations() {
+  $("personalRail").hidden = true;
+  $("personalEmpty").hidden = false;
+  state.ranking = null;
+  if (!state.user) { $("personalEmpty").textContent = "Inicia sesión para consultar tu selección personal."; return; }
+  $("personalEmpty").textContent = "Consultando tus recomendaciones…";
+  try {
+    const data = await request("/api/recommendations?limit=10");
+    if (data.model?.version !== "a9-miguel-diario" || !Array.isArray(data.recommendations) || !data.recommendations.length) throw new Error("No hay predicciones A9 publicadas para tu cuenta.");
+    state.ranking = data;
+    for (const movie of data.recommendations) state.catalog.set(Number(movie.movie_id), movie);
+    $("personalRail").innerHTML = data.recommendations.map(m => movieCard(m,{rank:true,surface:"a9"})).join("");
+    $("personalRail").hidden = false;
+    $("personalEmpty").hidden = true;
+    $("personalInfo").textContent = `GraphSAGE A9 · corte ${data.cutoff_date} · datos reales`;
+  } catch (error) {
+    $("personalEmpty").textContent = error.status === 404
+      ? "Todavía no se han publicado recomendaciones de GraphSAGE A9 para este usuario. Puedes explorar el catálogo mientras tanto."
+      : "No fue posible consultar el ranking de tu cuenta. Vuelve a intentarlo más tarde.";
+  }
+}
+async function loadWatchlist() {
+  $("watchlistRail").hidden = true;
+  $("watchlistEmpty").hidden = false;
+  if (!state.user) { $("watchlistEmpty").textContent = "Inicia sesión para ver tu lista."; return; }
+  try {
+    const result = await request("/api/interactions?limit=100");
+    const seen = new Set(); const list = [];
+    for (const row of result.interactions) {
+      if (row.interaction_type !== "watchlist" || seen.has(Number(row.movie_id))) continue;
+      seen.add(Number(row.movie_id));
+      list.push(state.catalog.get(Number(row.movie_id)) || {movie_id:row.movie_id,title:row.title,genres:[],release_year:null,poster_url:null});
     }
-    const file = DEMO_POSTERS[Number(movie.movie_id)];
-    return file ? `https://image.tmdb.org/t/p/w500/${file}` : "";
+    if (!list.length) { $("watchlistEmpty").textContent = "Las películas que guardes aparecerán aquí."; return; }
+    $("watchlistRail").innerHTML = list.map(m => movieCard(m,{surface:"watchlist"})).join("");
+    $("watchlistRail").hidden = false; $("watchlistEmpty").hidden = true;
+  } catch (_error) { $("watchlistEmpty").textContent = "No fue posible consultar tu lista."; }
+}
+async function sendInteraction(card, action, rating, control) {
+  if (!state.user) { showLogin(); return; }
+  if (state.busy) return;
+  state.busy = true; if (control) control.disabled = true;
+  try {
+    const isA9 = card.dataset.surface === "a9" && Boolean(state.ranking);
+    const metadata = { surface: isA9 ? "top10_a9" : "catalog",
+      model_version: isA9 ? "a9-miguel-diario" : null,
+      position: isA9 ? Number(card.dataset.rank) : null,
+      cutoff_date: isA9 ? state.ranking.cutoff_date : null };
+    if (isA9) metadata.recommendation_id = `${state.user.movielens_user_id}:${metadata.cutoff_date}:${metadata.position}`;
+    const response = await request("/api/interactions", { method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({movie_id:Number(card.dataset.movieId), interaction_type:action, rating, metadata}) });
+    if (!response.interaction) throw new Error("La interacción no quedó registrada.");
+    if (control?.tagName === "BUTTON") { control.classList.add("is-selected"); control.setAttribute("aria-pressed", "true"); }
+    toast(action === "watchlist" ? "Guardada en tu lista." : action === "rating" ? "Calificación guardada." : "Tu preferencia quedó guardada.");
+    if (action === "watchlist") await loadWatchlist();
+  } catch (error) { toast(error.message || "No se pudo guardar la interacción."); }
+  finally { state.busy = false; if (control) control.disabled = false; }
 }
 
-function showToast(message) {
-    toast.textContent = message;
-    toast.classList.add("visible");
-    window.clearTimeout(toastTimer);
-    toastTimer = window.setTimeout(() => toast.classList.remove("visible"), 3400);
-}
-
-function setLoading(isLoading) {
-    loadingSection.hidden = !isLoading;
-    submitButton.disabled = isLoading;
-    submitButton.querySelector("span").textContent = isLoading ? "Buscando…" : "Descubrir mi Top 10";
-    if (isLoading) {
-        resultsSection.hidden = true;
-        emptyState.hidden = true;
-    }
-}
-
-function interactionMetadata(card) {
-    const position = Number(card?.dataset.rank || 0) || null;
-    const cutoffDate = activeRecommendationContext?.cutoffDate || null;
-    const modelVersion = activeRecommendationContext?.modelVersion || null;
-    return {
-        recommendation_id: cutoffDate && position ? `${activeUserId}:${cutoffDate}:${position}` : null,
-        model_version: modelVersion,
-        position,
-        cutoff_date: cutoffDate,
-        surface: "top10",
-    };
-}
-
-async function saveInteraction(movieId, interactionType, rating = null, button = null, card = null) {
-    if (!activeUserId) {
-        showToast("Primero carga las recomendaciones de un usuario.");
-        return;
-    }
-    const sourceCard = card || button?.closest(".movie-card") || null;
-    if (button) button.disabled = true;
-    try {
-        const response = await fetch("/api/interactions", {
-            method: "POST",
-            headers: {"Content-Type": "application/json", "Accept": "application/json"},
-            body: JSON.stringify({
-                user_id: activeUserId,
-                movie_id: Number(movieId),
-                interaction_type: interactionType,
-                rating,
-                metadata: interactionMetadata(sourceCard),
-            }),
-        });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.message || "No se pudo guardar tu interacción.");
-        if (button) {
-            if (interactionType === "like" || interactionType === "dislike") {
-                sourceCard.querySelectorAll('[data-action="like"],[data-action="dislike"]')
-                    .forEach((item) => {
-                        item.classList.remove("is-selected");
-                        item.setAttribute("aria-pressed", "false");
-                    });
-            }
-            button.classList.add("is-selected");
-            button.setAttribute("aria-pressed", "true");
-        }
-        const labels = {
-            like: "¡Guardado! Te interesa esta película.",
-            dislike: "Tu preferencia quedó registrada.",
-            watchlist: "Película agregada a tu lista.",
-            rating: `Calificación de ${rating} estrellas guardada.`,
-        };
-        showToast(labels[interactionType] || "Interacción guardada.");
-    } catch (error) {
-        showToast(error.message || "No fue posible guardar la interacción.");
-    } finally {
-        if (button) button.disabled = false;
-    }
-}
-
-function cardMarkup(movie) {
-    const genres = (movie.genres || []).slice(0, 2)
-        .map((genre) => `<span class="genre-chip">${escapeHtml(genre)}</span>`).join("");
-    const numericScore = Number(movie.score);
-    const score = Number.isFinite(numericScore) ? numericScore.toFixed(3) : "n/d";
-    const poster = safePosterUrl(movie);
-    const image = poster
-        ? `<img src="${escapeHtml(poster)}" loading="lazy" decoding="async" alt="Póster de ${escapeHtml(movie.title)}">`
-        : "";
-    return `<article class="movie-card" data-movie-id="${escapeHtml(movie.movie_id)}" data-rank="${escapeHtml(movie.rank)}">
-        <div class="poster">
-          <div class="poster-fallback" aria-hidden="true">${escapeHtml(movie.title)}</div>
-          ${image}
-          <span class="poster-rank">#${escapeHtml(movie.rank)}</span>
-          <span class="poster-score">Score ${score}</span>
-        </div>
-        <div class="movie-info">
-          <h3 class="movie-title" title="${escapeHtml(movie.title)}">${escapeHtml(movie.title)}</h3>
-          <span class="movie-year">${escapeHtml(movie.release_year || "Año n/d")}</span>
-          <div class="genre-list">${genres}</div>
-        </div>
-        <div class="movie-actions">
-          <button type="button" class="feedback-button" data-action="like" aria-pressed="false" aria-label="Me interesa ${escapeHtml(movie.title)}">♥ Me gusta</button>
-          <button type="button" class="feedback-button is-negative" data-action="dislike" aria-pressed="false" aria-label="No me interesa ${escapeHtml(movie.title)}">✕ No me gusta</button>
-          <button type="button" class="feedback-button" data-action="watchlist" aria-pressed="false" aria-label="Agregar ${escapeHtml(movie.title)} a mi lista">＋ Mi lista</button>
-          <label class="rating-control">Calificar
-            <select data-action="rating" aria-label="Calificar ${escapeHtml(movie.title)}">
-              <option value="">Elegir estrellas</option>
-              <option value="5">★★★★★ (5)</option>
-              <option value="4.5">4,5 ★</option>
-              <option value="4">4 ★</option>
-              <option value="3.5">3,5 ★</option>
-              <option value="3">3 ★</option>
-              <option value="2.5">2,5 ★</option>
-              <option value="2">2 ★</option>
-              <option value="1.5">1,5 ★</option>
-              <option value="1">1 ★</option>
-              <option value="0.5">0,5 ★</option>
-            </select>
-          </label>
-        </div>
-      </article>`;
-}
-
-function filterMovies() {
-    const q = movieFilter.value.trim().toLocaleLowerCase("es");
-    const selection = currentRecommendations.filter((movie) => {
-        const haystack = [movie.title, ...(movie.genres || []), movie.release_year].join(" ").toLocaleLowerCase("es");
-        return haystack.includes(q);
-    });
-    visibleCount.textContent = selection.length;
-    movieGrid.innerHTML = selection.length
-        ? selection.map(cardMarkup).join("")
-        : '<p class="no-results">No encontramos películas con ese nombre en tu Top 10.</p>';
-}
-
-function renderRecommendations(data) {
-    activeUserId = data.user_id;
-    activeRecommendationContext = {
-        modelVersion: data.model?.version || null,
-        cutoffDate: data.cutoff_date || data.cutoff_week || null,
-    };
-    currentRecommendations = Array.isArray(data.recommendations) ? data.recommendations : [];
-    document.getElementById("resultCount").textContent = data.count;
-    document.getElementById("resultUser").textContent = data.user_id;
-    const name = (data.model?.name || "").toLowerCase();
-    const version = (data.model?.version || "").toLowerCase();
-    const demo = version === "baseline-v0" || name === "popularitybaseline";
-    document.getElementById("modelName").textContent = demo ? "Datos de prueba" : (data.model?.name || "—");
-    document.getElementById("modelVersion").textContent = demo ? "Demostración" : (data.model?.version || "—");
-    document.getElementById("cutoffWeek").textContent = activeRecommendationContext.cutoffDate || "—";
-    servingNotice.hidden = false;
-    servingNotice.textContent = demo
-        ? "Top-10 de demostración. Estas películas NO fueron recomendadas por GraphSAGE A9_sin_id; el modelo aún está pendiente de integración."
-        : "Estas recomendaciones vienen del modelo indicado. Los scores son valores de ranking, no probabilidades calibradas.";
-    movieFilter.value = "";
-    filterMovies();
-    emptyState.hidden = true;
-    resultsSection.hidden = false;
-    resultsSection.scrollIntoView({behavior: "smooth", block: "start"});
-}
-
-async function loadRecommendations(userId) {
-    const numericId = Number(userId);
-    if (!Number.isSafeInteger(numericId) || numericId <= 0) {
-        showToast("Ingresa un identificador de usuario válido.");
-        userInput.focus();
-        return;
-    }
-    setLoading(true);
-    try {
-        const response = await fetch(`/api/recommendations/${numericId}?limit=10`, {
-            headers: {"Accept": "application/json"},
-        });
-        const data = await response.json();
-        if (response.status === 404) {
-            activeUserId = null;
-            currentRecommendations = [];
-            resultsSection.hidden = true;
-            emptyState.hidden = false;
-            emptyState.scrollIntoView({behavior: "smooth", block: "center"});
-            return;
-        }
-        if (!response.ok) throw new Error(data.message || "No fue posible obtener el ranking.");
-        renderRecommendations(data);
-    } catch (error) {
-        showToast(error.message || "Ocurrió un error inesperado.");
-    } finally {
-        setLoading(false);
-    }
-}
-
-movieGrid.addEventListener("click", (event) => {
-    const button = event.target.closest("button[data-action]");
-    if (!button) return;
-    const card = button.closest(".movie-card");
-    if (!card) return;
-    saveInteraction(card.dataset.movieId, button.dataset.action, null, button, card);
+$("openLogin").addEventListener("click", showLogin);
+$("closeLogin").addEventListener("click", hideLogin);
+document.querySelector("[data-close-login]").addEventListener("click", hideLogin);
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("loginModal").hidden) hideLogin(); });
+$("loginForm").addEventListener("submit", async e => {
+  e.preventDefault(); $("loginSubmit").disabled = true; $("loginError").hidden = true;
+  try {
+    const data = await request("/api/auth/login", { method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({username:$("loginUsername").value,password:$("loginPassword").value}) });
+    state.user = data.user; state.csrf = data.csrf_token;
+    hideLogin(); renderAuth(); await Promise.all([loadRecommendations(), loadWatchlist()]); toast(`Bienvenido, ${state.user.username}.`);
+  } catch (error) { $("loginError").textContent = error.message; $("loginError").hidden = false; }
+  finally { $("loginSubmit").disabled = false; }
 });
-
-movieGrid.addEventListener("change", (event) => {
-    const select = event.target.closest('select[data-action="rating"]');
-    if (!select || !select.value) return;
-    const card = select.closest(".movie-card");
-    if (card) saveInteraction(card.dataset.movieId, "rating", Number(select.value), null, card);
+$("logoutButton").addEventListener("click", async () => {
+  try { const data = await request("/api/auth/logout",{method:"POST"});state.csrf=data.csrf_token;
+    state.user=null;state.ranking=null;renderAuth();await Promise.all([loadRecommendations(),loadWatchlist()]);toast("Sesión cerrada."); }
+  catch(e){ toast(e.message); }
 });
-
-movieFilter.addEventListener("input", filterMovies);
-function runDemo() {
-    userInput.value = window.CINEGRAPH_DEMO_USER || 414;
-    loadRecommendations(userInput.value);
-}
-form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    loadRecommendations(userInput.value);
+document.addEventListener("click", (event) => {
+  const nav = event.target.closest(".shelf-arrow");
+  if (nav) { const track = nav.closest(".catalog-row")?.querySelector(".shelf-track");
+    if (track) track.scrollBy({left:Number(nav.dataset.direction)*track.clientWidth*.83,behavior:"smooth"}); return; }
+  const button = event.target.closest("button[data-action]");
+  if (!button) return;
+  const card = button.closest(".movie-card");
+  if (card) sendInteraction(card,button.dataset.action,null,button);
 });
-demoButton.addEventListener("click", runDemo);
-emptyDemoButton.addEventListener("click", runDemo);
-
-
-// Broken remote poster URLs should never leave visible broken-image icons.
+document.addEventListener("change", (event) => {
+  const select = event.target.closest('select[data-action="rating"]');
+  if (!select || !select.value) return;
+  const card = select.closest(".movie-card");
+  if (card) sendInteraction(card,"rating",Number(select.value),select);
+});
 document.addEventListener("error", (event) => {
-    if (event.target instanceof HTMLImageElement &&
-        event.target.matches(".editorial-image img, .poster img")) {
-        event.target.remove();
-    }
-}, true);
+  if (event.target instanceof HTMLImageElement && event.target.closest(".poster")) event.target.remove();
+},true);
+window.addEventListener("scroll", () => $("topbar").classList.toggle("is-scrolled", window.scrollY > 24), {passive:true});
+(async () => {
+  try { const data = await request("/api/auth/me"); state.csrf = data.csrf_token; state.user = data.user || null; }
+  catch (_error) { $("catalogStatus").textContent = "El servidor aún no está preparado. Ejecuta el bootstrap local."; }
+  renderAuth();
+  await loadCatalog();
+  await Promise.all([loadRecommendations(),loadWatchlist()]);
+})();

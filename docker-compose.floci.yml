@@ -1,5 +1,4 @@
-# Opt-in local AWS emulator. Does not modify normal docker compose usage.
-# Start explicitly: docker compose -f docker-compose.yml -f docker-compose.floci.yml --profile floci up -d floci
+# Emulación local Floci, sin recursos AWS reales.
 services:
   floci:
     profiles: ["floci"]
@@ -11,7 +10,6 @@ services:
       FLOCI_DEFAULT_REGION: us-east-1
       FLOCI_STORAGE_MODE: persistent
       FLOCI_STORAGE_PERSISTENT_PATH: /app/data
-      # Emulator-only: flush a Firehose buffer as soon as it has 1 record.
       FLOCI_SERVICES_FIREHOSE_FLUSH_RECORD_COUNT: "1"
     volumes:
       - floci_data:/app/data
@@ -36,6 +34,24 @@ services:
       - floci_ship_state:/state
     depends_on:
       - floci
+
+  a9-publish:
+    profiles: ["floci"]
+    build:
+      context: .
+      dockerfile: infrastructure/docker/app.Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://recommender:recommender@db:5432/recommender
+      CINEGRAPH_LOCAL_SETUP: "1"
+    volumes:
+      - ./scripts/ml/publish_a9_local.py:/app/scripts/ml/publish_a9_local.py:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      floci:
+        condition: service_started
+    entrypoint: ["python"]
+    command: ["/app/scripts/ml/publish_a9_local.py"]
 
 volumes:
   floci_data:

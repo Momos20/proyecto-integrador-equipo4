@@ -35,7 +35,7 @@ El script es reejecutable sin duplicar recursos. El rol ARN usado es ficticio y 
 
 ## 3. Generar interacciones reales del frontend
 
-En **http://localhost:8000**: usuario `414`, «Descubrir», después «Me interesa» o «Mi lista» en una película.
+En **http://localhost:8000**: después del bootstrap local inicia sesión como `cine414` (o `cine123`, `cine456`), desplázate por las filas de películas MovieLens y usa «Me gusta» o «Mi lista». No se presenta el botón «Descubrir mi Top 10» ni recomendaciones simuladas.
 
 Comprobar que el backend guardó el evento antes de publicarlo:
 
@@ -96,3 +96,7 @@ El mismo bucket emulado `cinegraph-local-datalake` puede almacenar el Parquet de
 Guía: [`docs/a9-ejecucion-floci.md`](a9-ejecucion-floci.md). Script: `scripts/ml/run_a9_floci.py`. Las salidas quedan bajo `predictions/a9/` en el S3 local, mientras que Kinesis/Firehose publica eventos bajo `raw/behavioral/cinegraph/live/`. Son dos circuitos diferentes; ninguno arranca automáticamente al hacer clic.
 
 No utilizar `scripts/ml/run_a9_s3.py`: era una preparación prematura para AWS real y fue retirada para evitar confusiones en esta fase.
+
+## Autenticación, MovieLens real y publicación A9
+
+La interfaz ahora usa sesiones privadas, catálogo MovieLens 32M verificado y filas horizontales. El `baseline-v0` anterior se elimina mediante el bootstrap sin borrar interacciones. La inferencia GraphSAGE de Miguel y la publicación a PostgreSQL siguen siendo pasos manuales. [Guía completa](cinegraph-login-real-a9.md).

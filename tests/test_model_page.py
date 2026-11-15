@@ -1,33 +1,25 @@
+from pathlib import Path
 from app.main import create_app
 
 
-def test_home_is_cinematic_and_shows_only_the_selected_model():
-    app = create_app()
-    app.config.update(TESTING=True)
-    response = app.test_client().get("/")
-
-    assert response.status_code == 200
-    page = response.get_data(as_text=True)
-    assert "CineGraph" in page
-    assert 'class="cinema-hero"' in page
-    assert "Historias que se quedan" in page
-    assert "A9_sin_id" in page
-    assert "A0_base" not in page
-    assert "Recall@10 0,0938" in page
-    assert "NDCG@10 0,0663" in page
-    assert "horizonte de 7 días" in page
-    assert "Top-10 actual es de demostración" in page
-    assert "Netflix" not in page
-    for element_id in ("recommendationForm", "userId", "movieGrid", "resultsSection",
-                       "loadingSection", "emptyState", "demoButton", "emptyDemoButton",
-                       "servingNotice", "movieFilter"):
-        assert f'id="{element_id}"' in page
+def test_netflix_like_home_has_no_fake_ranking_or_button():
+    app=create_app();app.config.update(TESTING=True)
+    r=app.test_client().get("/")
+    assert r.status_code==200
+    page=r.get_data(as_text=True)
+    for fragment in ('id="loginForm"','id="personalRail"','id="catalogShelves"','id="watchlistRail"','id="loginModal"'):
+        assert fragment in page
+    assert "Descubrir mi Top 10" not in page
+    assert "Modo demostración" not in page
+    assert "Top-10 de demostración" not in page
+    assert "image.tmdb.org/t/p/w500/" not in page
 
 
-def test_home_keeps_interaction_actions_in_client_script():
-    js = __import__("pathlib").Path("app/static/js/app.js").read_text(encoding="utf-8")
-    for action in ('data-action="like"', 'data-action="dislike"',
-                   'data-action="watchlist"', 'data-action="rating"'):
-        assert action in js
-    assert 'fetch("/api/interactions"' in js
-    assert 'fetch(`/api/recommendations/' in js
+def test_client_consults_only_current_account_and_real_catalog():
+    js=Path("app/static/js/app.js").read_text("utf-8")
+    assert '/api/recommendations?limit=10' in js
+    assert '/api/auth/me' in js
+    assert '/api/catalog?' in js
+    assert '/api/interactions' in js
+    assert 'DEMO_POSTERS' not in js
+    assert 'CINEGRAPH_DEMO_USER' not in js

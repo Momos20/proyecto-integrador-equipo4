@@ -15,6 +15,14 @@ El diseño objetivo prevé **scoring diario**, con reentrenamiento periódico o 
 
 **Primero Floci + Docker en la Mac; AWS Academy después.** No se requiere cuenta, consola ni recursos AWS reales para las pruebas de esta fase. `docker-compose.floci.yml` emula S3, Kinesis y Firehose en `http://127.0.0.1:4566`. GraphSAGE A9 se ejecuta con Python/PyTorch local (Floci no ejecuta por sí mismo el modelo). El batch de A9 y el flujo Kinesis/Firehose son pruebas manuales independientes. [Guía para A9 + Floci](docs/a9-ejecucion-floci.md).
 
+## CineGraph real en Floci local
+
+La interfaz carga **películas originales MovieLens 32M verificadas por MD5**, utiliza inicio de sesión con cuentas locales y muestra recomendaciones únicamente tras publicar una inferencia **GraphSAGE A9 real de Miguel**. El ranking ficticio `baseline-v0` fue retirado; las filas se exploran bajando y desplazándose horizontalmente, sin el botón «Descubrir mi Top 10».
+
+**Primero Docker + Floci local; AWS Academy después.** No usamos cuentas ni consola AWS para esta etapa. [Guía de acceso, catálogo y publicación A9](docs/cinegraph-login-real-a9.md).
+
+El A9 original tiene **horizonte diario**, no una evaluación nueva de siete días.
+
 ## Arquitectura objetivo
 
 - **Fuentes históricas:** MovieLens 32M y metadatos de TMDB.
@@ -48,7 +56,7 @@ La [guía de datos para A9](data/reference/movielens32m/README.md) incluye el co
 
 Miguel entregó los archivos de `A0_base` y `A9_sin_id`, organizados en [`ml/models/`](ml/models/README.md). **A9 contiene un checkpoint `modelo.pt`** y métricas de validación registradas (Recall@20 0.138956; NDCG@20 0.091508 en el paso 1600). **A0 solo tiene su curva**. Se conservaron los archivos originales.
 
-La configuración de A9 señala `atributos_semanales=true` y aún debe comprobarse su compatibilidad con el protocolo diario de siete días. La implementación de Miguel `A9_topk_diario` ya está incorporada en [`ml/a9_daily/`](ml/a9_daily/), con el código de carga, inferencia, pruebas y validación diaria, sin modificar GraphSAGE. El orquestador nuevo está en `scripts/ml/run_a9_floci.py` y se ejecuta solo de forma manual. La validación aportada se refiere a predicciones **del mismo día**, no al objetivo de **7 días** elegido para CineGraph. Véanse [revisión de la entrega](docs/revision-a9-miguel.md) e [importación aislada](docs/revision-a9-miguel.md#importación-segura-del-código). El checkpoint todavía no está conectado a un proceso de scoring ejecutado y validado en nuestro entorno, por lo que el Top-10 de demostración que devuelve PostgreSQL corresponde a `PopularityBaseline` (`baseline-v0`) y **no a GraphSAGE A9**.
+El código original de Miguel `A9_topk_diario` está en [`ml/a9_daily/`](ml/a9_daily/), con pruebas y métricas históricas. Los pesos están en `ml/models/A9_sin_id/modelo.pt`, sin modificación. Se dispone del ejecutor local `scripts/ml/run_a9_floci.py` y del publicador `scripts/ml/publish_a9_local.py`, pero **todavía no afirmamos que el scoring se haya ejecutado en el Mac ni que existan recomendaciones personales publicadas**. La aplicación no sustituye la ausencia de A9 con `baseline-v0` ni otros rankings ficticios.
 
 El workflow CI de GitHub Actions permanece disponible **solo mediante ejecución manual** desde «Run workflow»; un push o PR no lo dispara.
 
@@ -120,11 +128,13 @@ Las interacciones quedan persistidas en `user_interactions` y, simultáneamente,
 
 - `GET /health`: liveness de la aplicación.
 - `GET /api/ready`: readiness de la aplicación y PostgreSQL.
-- `GET /api/recommendations/<user_id>`: devuelve el ranking más reciente del usuario.
-- `POST /api/interactions`: registra feedback del usuario.
-- `GET /api/interactions/<user_id>`: consulta feedback reciente.
+- `GET /api/catalog`: películas del catálogo MovieLens 32M original verificado.
+- `GET /api/auth/me`, `POST /api/auth/login`, `POST /api/auth/logout`: sesión local.
+- `GET /api/recommendations`: ranking A9 únicamente de la cuenta autenticada, si ya existe.
+- `POST /api/interactions`: feedback de la cuenta autenticada con CSRF.
+- `GET /api/interactions`: feedback reciente de la cuenta autenticada.
 
-El usuario de demostración cargado por el seed local es `414`.
+Los usuarios de laboratorio `cine414`, `cine123`, `cine456` se crean con contraseñas aleatorias mediante el bootstrap; no son identidades reales de los participantes de MovieLens.
 
 ## Pruebas de AWS en local con Floci
 
@@ -138,7 +148,7 @@ docker compose -f docker-compose.yml -f docker-compose.floci.yml --profile floci
 docker compose -f docker-compose.yml -f docker-compose.floci.yml --profile floci run --rm floci-tools verify
 ```
 
-El publicador de laboratorio es **manual**; el Kinesis Agent de EC2 no se modifica. Glue/SageMaker reales son objetivos posteriores, no servicios utilizados ahora.
+La publicación de eventos a Kinesis/Firehose y la de rankings A9 a PostgreSQL son **manuales y separadas**. El Kinesis Agent de EC2 sigue intacto. Glue/SageMaker reales son objetivos posteriores para AWS Academy.
 
 ### Prueba local de A9 con MovieLens 32M
 
@@ -192,6 +202,9 @@ docs/data/clickstream_schema.md
 
 ## Desarrollo local
 
+Después de iniciar la aplicación, ejecuta **una sola vez** `docker compose --profile setup run --rm local-setup`. El bootstrap importa 87.585 películas auténticas, aplica la migración de cuentas y retira el seed anterior sin borrar interacciones. Guarda las claves que se mostrarán en Terminal. [Pasos completos](docs/cinegraph-login-real-a9.md).
+
+
 ```bash
 cp .env.example .env
 docker compose up -d --build
@@ -224,7 +237,7 @@ Actualmente solo se mantiene `main` en el repositorio remoto, por decisión del 
 
 ## Estado del proyecto
 
-MVP Flask + PostgreSQL con feedback operacional funcional. El backend produce clickstream JSONL y el repositorio incluye configuración de Kinesis Agent. Se recibieron los modelos de Miguel; A9 ya tiene su código original en `ml/a9_daily/` y checkpoint en `ml/models/`. La ejecución real de sus pruebas, la inferencia Top-K sobre MovieLens 32M y su publicación en PostgreSQL **aún no han sido verificadas**. El laboratorio Floci es la fase actual; el despliegue en AWS Academy y el pipeline `Raw → Curated → Features → scoring diario` quedan para después.
+MVP Flask + PostgreSQL con feedback operacional funcional. El backend produce clickstream JSONL y el repositorio incluye configuración de Kinesis Agent. El catálogo original y las cuentas locales están preparados mediante un bootstrap manual. El frontend no muestra predicciones ficticias y la API solo consulta A9 publicado con manifiesto verificable. **La ejecución de GraphSAGE A9 sobre MovieLens 32M y la publicación resultante todavía requieren ejecución en el Mac del equipo.** Se conservan los pesos y el protocolo de Miguel. Floci es la fase actual; AWS Academy vendrá después.
 
 ## Equipo 4
 

@@ -2,208 +2,88 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0a0a0b">
-  <meta name="description" content="CineGraph: descubre películas, construye tus gustos y explora tu Top 10. Proyecto integrador de recomendación con GraphSAGE.">
-  <title>CineGraph · Historias para ti</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#090b0d">
+  <meta name="description" content="CineGraph: explora MovieLens 32M y recibe recomendaciones personales reales de GraphSAGE A9.">
+  <title>CineGraph · Tu universo de cine</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/interactions.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static',filename='css/styles.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static',filename='css/interactions.css') }}">
 </head>
 <body>
-  <a class="skip-link" href="#descubrir">Ir a las recomendaciones</a>
-  <header class="site-header">
-    <div class="site-nav shell">
-      <a href="#inicio" class="brand" aria-label="CineGraph · inicio">
-        <span class="brand-symbol" aria-hidden="true"><i></i><i></i><i></i></span><span>CINE<span class="brand-accent">GRAPH</span></span>
-      </a>
-      <nav class="main-nav" aria-label="Navegación principal">
-        <a href="#inicio">Inicio</a>
-        <a href="#catalogo">Explorar</a>
-        <a href="#tecnologia">Cómo funciona</a>
-      </nav>
-      <a class="nav-cta" href="#descubrir"><span>Mi selección</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 7 7-7 7"/></svg></a>
+  <a class="skip-link" href="#catalogo">Ir a las películas</a>
+  <header class="topbar" id="topbar">
+    <div class="topbar-inner">
+      <a href="#inicio" class="brand" aria-label="CineGraph, inicio"><span class="brand-emblem">C<span>G</span></span><span>CINE<span class="brand-red">GRAPH</span></span></a>
+      <nav class="main-nav" aria-label="Principal"><a href="#inicio">Inicio</a><a href="#paraTi">Para ti</a><a href="#catalogo">Películas</a><a href="#miLista">Mi lista</a></nav>
+      <div class="account-area">
+        <span id="accountName" class="account-name" hidden></span>
+        <button type="button" id="openLogin" class="profile-button">Iniciar sesión</button>
+        <button type="button" id="logoutButton" class="profile-button profile-button-subtle" hidden>Salir</button>
+      </div>
     </div>
   </header>
 
   <main>
-    <section class="cinema-hero" id="inicio" aria-labelledby="heroTitle">
-      <div class="hero-backdrop" aria-hidden="true"></div>
-      <div class="hero-shade" aria-hidden="true"></div>
-      <div class="hero-content shell">
-        <div class="eyebrow"><span class="eyebrow-rule"></span> UN UNIVERSO DE PELÍCULAS PARA TI</div>
-        <h1 id="heroTitle">Historias que se quedan.<br><span>Películas que conectan.</span></h1>
-        <p class="hero-text">Descubre una nueva forma de explorar el cine. Tus gustos y tus interacciones nos ayudan a construir recomendaciones cada vez más relevantes.</p>
-        <div class="hero-buttons">
-          <a class="primary-button" href="#descubrir">
-            <svg class="play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 12 7-12 7V5Z"/></svg>
-            Descubrir mi Top 10
-          </a>
-          <a class="outline-button" href="#catalogo">
-            Explorar películas
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 14 0m-6-6 6 6-6 6"/></svg>
-          </a>
-        </div>
-        <div class="hero-facts" aria-label="Información de CineGraph">
-          <span><i class="fact-dot"></i> Catálogo de películas</span>
-          <span>Recomendaciones Top-K</span>
-          <span>Feedback personalizado</span>
-        </div>
+    <section class="hero" id="inicio">
+      <div class="hero-visual" aria-hidden="true"><div class="hero-halo"></div><div class="hero-monogram">CINE<br><span>GRAPH.</span></div></div>
+      <div class="hero-content">
+        <div class="hero-eyebrow"><span></span> EL CINE TIENE OTRA FORMA DE ENCONTRARTE</div>
+        <h1>Una historia más.<br><em>Una que sea tuya.</em></h1>
+        <p>Explora películas de MovieLens 32M. Cuando tu selección de GraphSAGE esté disponible, aparecerá aquí de manera natural.</p>
+        <p id="heroAccount" class="hero-account">Explora el catálogo. Inicia sesión para guardar tus gustos y ver tu selección personal.</p>
       </div>
-      <div class="hero-feature shell" aria-label="Película destacada del catálogo">
-        <span class="featured-index">01 / CINE SELECCIONADO</span>
-        <div class="featured-title">INCEPTION <span>2010</span></div>
-        <span class="featured-caption">Acción · Ciencia ficción · Suspenso</span>
-      </div>
-      <div class="hero-fade" aria-hidden="true"></div>
+      <div class="hero-bottom" aria-hidden="true"></div>
     </section>
 
-    <section class="catalog-section shell" id="catalogo" aria-labelledby="catalogTitle">
-      <div class="section-heading">
-        <div>
-          <p class="section-kicker"><span class="red-line"></span> PARA EMPEZAR</p>
-          <h2 id="catalogTitle">El cine que <em>nunca pasa de moda.</em></h2>
-          <p class="section-description">Un vistazo al catálogo de demostración. Estas películas no representan predicciones del modelo.</p>
-        </div>
-        <a href="#descubrir" class="section-link">Ver mi selección <span aria-hidden="true">↗</span></a>
+    <section class="shelf-section first-shelf" id="paraTi" aria-labelledby="personalTitle">
+      <div class="shelf-head">
+        <div><p class="eyebrow-small">HECHO PARA TU PERFIL</p><h2 id="personalTitle">Tu selección personal</h2></div>
+        <span class="shelf-caption" id="personalInfo">GraphSAGE A9 · resultados publicados</span>
       </div>
-      <div class="editorial-gallery">
-        <article class="editorial-card">
-          <div class="editorial-image"><img src="https://image.tmdb.org/t/p/w500/f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg" alt="Póster de The Matrix" loading="lazy" decoding="async"></div>
-          <div class="editorial-meta"><span>The Matrix</span><small>1999 · Ciencia ficción</small></div>
-        </article>
-        <article class="editorial-card">
-          <div class="editorial-image"><img src="https://image.tmdb.org/t/p/w500/qJ2tW6WMUDux911r6m7haRef0WH.jpg" alt="Póster de The Dark Knight" loading="lazy" decoding="async"></div>
-          <div class="editorial-meta"><span>The Dark Knight</span><small>2008 · Acción</small></div>
-        </article>
-        <article class="editorial-card">
-          <div class="editorial-image"><img src="https://image.tmdb.org/t/p/w500/oYuLEt3zVCKq57qu2F8dT7NIa6f.jpg" alt="Póster de Inception" loading="lazy" decoding="async"></div>
-          <div class="editorial-meta"><span>Inception</span><small>2010 · Suspenso</small></div>
-        </article>
-        <article class="editorial-card">
-          <div class="editorial-image"><img src="https://image.tmdb.org/t/p/w500/6oom5QYQ2yQTMJIbnvbkBL9cHo6.jpg" alt="Póster de The Fellowship of the Ring" loading="lazy" decoding="async"></div>
-          <div class="editorial-meta"><span>The Fellowship of the Ring</span><small>2001 · Fantasía</small></div>
-        </article>
-        <article class="editorial-card">
-          <div class="editorial-image"><img src="https://image.tmdb.org/t/p/w500/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg" alt="Póster de Fight Club" loading="lazy" decoding="async"></div>
-          <div class="editorial-meta"><span>Fight Club</span><small>1999 · Drama</small></div>
-        </article>
-      </div>
+      <div class="shelf-message" id="personalEmpty" role="status">Inicia sesión para ver si tienes recomendaciones disponibles.</div>
+      <div class="shelf-track" id="personalRail" aria-label="Recomendaciones personalizadas" hidden></div>
     </section>
 
-    <section class="discover-section" id="descubrir" aria-labelledby="discoverTitle">
-      <div class="discover-inner shell">
-        <div class="discover-intro">
-          <div>
-            <p class="section-kicker"><span class="red-line"></span> UNA EXPERIENCIA PERSONAL</p>
-            <h2 id="discoverTitle">Tu próxima película <em>empieza aquí.</em></h2>
-            <p>Introduce tu identificador y descubre el Top 10 disponible. También puedes probar con el usuario de demostración.</p>
-          </div>
-          <div class="discover-count" aria-hidden="true"><strong>10</strong><span>HISTORIAS<br>POR DESCUBRIR</span></div>
-        </div>
-        <div class="search-panel" id="searchPanel">
-          <form id="recommendationForm" autocomplete="off">
-            <label for="userId">Tu identificador</label>
-            <div class="search-row">
-              <div class="input-wrap">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z"/></svg>
-                <input id="userId" name="userId" type="number" min="1" step="1" inputmode="numeric" placeholder="Por ejemplo, {{ demo_user_id }}" value="{{ demo_user_id }}" required>
-              </div>
-              <button class="primary-button" id="submitButton" type="submit">
-                <span>Descubrir mi Top 10</span>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 14 0m-6-6 6 6-6 6"/></svg>
-              </button>
-            </div>
-          </form>
-          <div class="search-footer">
-            <span><svg viewBox="0 0 24 24"><path d="m4 12 5 5L20 6"/></svg> Sin registro · Modo demostración</span>
-            <button type="button" class="demo-link" id="demoButton">Probar usuario {{ demo_user_id }} <span aria-hidden="true">↗</span></button>
-          </div>
-        </div>
-      </div>
+    <section class="shelf-section" id="catalogo" aria-labelledby="catalogTitle">
+      <div class="shelf-head"><div><p class="eyebrow-small">EL CATÁLOGO REAL</p><h2 id="catalogTitle">Películas para explorar</h2></div><span class="shelf-caption">Fuente: MovieLens 32M</span></div>
+      <div class="shelf-message" id="catalogStatus" role="status">Cargando catálogo…</div>
+      <div id="catalogShelves" class="catalog-shelves"></div>
     </section>
 
-    <section class="results-section shell" id="resultsSection" hidden aria-labelledby="resultsTitle">
-      <div class="results-heading">
-        <div>
-          <p class="section-kicker"><span class="red-line"></span> SELECCIONADAS PARA TI</p>
-          <h2 id="resultsTitle">Tu Top <span id="resultCount">10</span> <em>de películas.</em></h2>
-          <p>Un ranking guardado para el usuario <strong id="resultUser">—</strong>. Puedes valorar títulos y registrar tus preferencias.</p>
-        </div>
-        <div class="result-meta" id="modelSummary">
-          <div><span>Origen</span><strong id="modelName">—</strong></div>
-          <div><span>Versión</span><strong id="modelVersion">—</strong></div>
-          <div><span>Corte</span><strong id="cutoffWeek">—</strong></div>
-        </div>
-      </div>
-      <p id="servingNotice" class="serving-notice" role="status" aria-live="polite" hidden></p>
-      <div class="results-toolbar">
-        <span>LA SELECCIÓN COMPLETA <i aria-hidden="true"></i> <span id="visibleCount">10</span> TÍTULOS</span>
-        <label class="results-filter" for="movieFilter">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>
-          <input type="search" id="movieFilter" placeholder="Buscar en mi Top 10" autocomplete="off">
-        </label>
-      </div>
-      <div class="movie-grid" id="movieGrid"></div>
-      <p class="feedback-note">Tus acciones se guardan en PostgreSQL. El ranking se actualizará únicamente cuando se publique un nuevo scoring; los scores no son probabilidades calibradas.</p>
+    <section class="shelf-section" id="miLista" aria-labelledby="listTitle">
+      <div class="shelf-head"><div><p class="eyebrow-small">TU ESPACIO</p><h2 id="listTitle">Mi lista</h2></div><span class="shelf-caption">Guardada en PostgreSQL</span></div>
+      <div class="shelf-message" id="watchlistEmpty">Inicia sesión para guardar películas en tu lista.</div>
+      <div class="shelf-track" id="watchlistRail" hidden></div>
     </section>
 
-    <section class="loading-section shell" id="loadingSection" hidden aria-live="polite">
-      <div class="skeleton-header"></div>
-      <div class="skeleton-grid"><div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div></div>
-    </section>
-
-    <section class="empty-state shell" id="emptyState" hidden aria-live="polite">
-      <div class="empty-icon">◎</div>
-      <h2>Este usuario todavía no tiene selección.</h2>
-      <p>Por ahora puedes explorar la demostración con el usuario {{ demo_user_id }}.</p>
-      <button class="outline-button" type="button" id="emptyDemoButton">Explorar la demostración <span aria-hidden="true">↗</span></button>
-    </section>
-
-    <section class="story-section shell" id="tecnologia" aria-labelledby="storyTitle">
-      <div class="section-heading">
-        <div>
-          <p class="section-kicker"><span class="red-line"></span> MÁS ALLÁ DEL CATÁLOGO</p>
-          <h2 id="storyTitle">Detrás de cada recomendación, <em>una conexión.</em></h2>
-        </div>
-      </div>
-      <div class="story-grid">
-        <div class="story-panel">
-          <div class="story-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="6" r="2"/><circle cx="18" cy="5" r="2"/><circle cx="12" cy="18" r="2"/><path d="M7 6h9m1 1-4 9M6 8l5 8"/></svg></div>
-          <span class="story-number">01 / DESCUBRE</span>
-          <h3>Tu universo de cine</h3>
-          <p>Explora historias y encuentra películas que podrían encajar con tus intereses.</p>
-        </div>
-        <div class="story-panel">
-          <div class="story-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg></div>
-          <span class="story-number">02 / CONECTA</span>
-          <h3>Cuéntanos qué te gusta</h3>
-          <p>Marca tus favoritas, guarda películas y califica títulos. Cada señal queda registrada.</p>
-        </div>
-        <div class="story-panel">
-          <div class="story-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17 10 11l4 4 6-8M16 7h4v4"/></svg></div>
-          <span class="story-number">03 / EVOLUCIONA</span>
-          <h3>Recomendaciones que aprenden</h3>
-          <p>GraphSAGE A9_sin_id es el modelo seleccionado. Su integración con el Top-K todavía está en desarrollo.</p>
-        </div>
-      </div>
-      <div class="model-disclosure">
-        <div><span class="model-indicator"></span><strong>Modelo de investigación: GraphSAGE A9_sin_id</strong></div>
-        <p>Validación diaria informada: Recall@10 0,0938 · NDCG@10 0,0663, con objetivo del mismo día. Todavía falta validar el horizonte de 7 días. El Top-10 actual es de demostración y no lo genera A9.</p>
-      </div>
+    <section class="project-note" aria-label="Información del proyecto">
+      <div><span class="note-label">DETRÁS DE CINEGRAPH</span><h2>Una experiencia construida con datos, no con rankings inventados.</h2></div>
+      <p>El catálogo procede de MovieLens 32M. Las recomendaciones personales solo se muestran después de publicar resultados reales de GraphSAGE A9 de Miguel. Tus interacciones se registran en PostgreSQL y pueden enviarse a Kinesis y S3 con Floci local. No se recalcula el modelo en cada clic.</p>
     </section>
   </main>
 
-  <footer class="site-footer">
-    <div class="shell footer-inner">
-      <div><div class="footer-logo">CINE<span>GRAPH</span></div><p>Una forma distinta de conectar con el cine.</p></div>
-      <div class="footer-end"><span>Proyecto Integrador · Equipo 4</span><span>GraphSAGE × MovieLens 32M × AWS</span><a href="https://www.themoviedb.org/" rel="noopener noreferrer" target="_blank">Imágenes promocionales: TMDB</a></div>
-    </div>
-  </footer>
+  <footer class="footer"><span>CINE<span class="brand-red">GRAPH</span></span><small>Proyecto integrador · Equipo 4 · MovieLens 32M · GraphSAGE</small></footer>
+
+  <div id="loginModal" class="modal" hidden>
+    <div class="modal-overlay" data-close-login></div>
+    <section class="login-panel" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+      <button type="button" class="modal-close" id="closeLogin" aria-label="Cerrar">✕</button>
+      <p class="eyebrow-small">TU PERFIL DE CINE</p>
+      <h2 id="loginTitle">Bienvenido a CineGraph</h2>
+      <p class="login-help">Ingresa con tu cuenta local asociada a MovieLens. Las recomendaciones son privadas.</p>
+      <form id="loginForm">
+        <label for="loginUsername">Usuario</label><input id="loginUsername" name="username" required autocomplete="username" maxlength="80" placeholder="cine414">
+        <label for="loginPassword">Contraseña</label><input id="loginPassword" name="password" required type="password" autocomplete="current-password" placeholder="Tu contraseña">
+        <p class="login-error" id="loginError" role="alert" hidden></p>
+        <button type="submit" id="loginSubmit" class="login-submit">Entrar a mi perfil</button>
+      </form>
+      <p class="login-footnote">Las cuentas de prueba se crean localmente. No son usuarios reales registrados de MovieLens.</p>
+    </section>
+  </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script>window.CINEGRAPH_DEMO_USER = {{ demo_user_id|tojson }};</script>
-  <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+  <script src="{{ url_for('static',filename='js/app.js') }}" defer></script>
 </body>
 </html>
