@@ -43,6 +43,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://recommender:recommender@db:5432/recommender
       CINEGRAPH_LOCAL_SETUP: "1"
+      PYTHONPATH: /app
     volumes:
       - ./scripts/ml/publish_a9_local.py:/app/scripts/ml/publish_a9_local.py:ro
     depends_on:
