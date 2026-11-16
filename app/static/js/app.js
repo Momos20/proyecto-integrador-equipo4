@@ -5,7 +5,7 @@
 const $ = (id) => document.getElementById(id);
 const state = { user: null, csrf: null, catalog: new Map(), ranking: null, busy: false };
 const rails = [
-  { id: "new", title: "Recién llegadas al catálogo", genre: null },
+  { id: "new", title: "Cine destacado del catálogo", genre: null },
   { id: "action", title: "Acción y aventura", genre: "Action" },
   { id: "scifi", title: "Ciencia ficción", genre: "Sci-Fi" },
   { id: "drama", title: "Historias que emocionan", genre: "Drama" },
