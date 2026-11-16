@@ -35,6 +35,19 @@ services:
     depends_on:
       - floci
 
+  behavioral-transform:
+    profiles: ["floci"]
+    build:
+      context: .
+      dockerfile: infrastructure/docker/behavioral-transform.Dockerfile
+    environment:
+      # SOLO emulador Floci local: nunca contacta a Amazon S3.
+      AWS_ENDPOINT_URL: http://floci:4566
+    depends_on:
+      floci:
+        condition: service_started
+    command: ["run"]
+
   a9-publish:
     profiles: ["floci"]
     build:

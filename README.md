@@ -200,6 +200,17 @@ docs/data/clickstream_schema.md
 └── .github/workflows/      # CI/CD
 ```
 
+## Transformación local Raw → Curated → Features
+
+Ahora hay un proceso **manual** de DataOps para los eventos reales de CineGraph ya recibidos en S3 Floci. Valida el esquema v1, deduplica por `event_id` en todo Raw, separa cuarentena y genera agregados `user_movie_daily` y `user_daily` (JSONL). Crea snapshots versionados con checksums y publica el manifiesto `curated/behavioral/cinegraph/latest.json` al final. Conserva Raw y PostgreSQL. **No modifica el modelo A9 ni ejecuta AWS Glue real**.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.floci.yml --profile floci run --rm --build behavioral-transform
+docker compose -f docker-compose.yml -f docker-compose.floci.yml --profile floci run --rm behavioral-transform verify
+```
+
+Guía, esquema y controles: [docs/transformacion-behavioral-local.md](docs/transformacion-behavioral-local.md).
+
 ## Pósteres reales y portada cinematográfica
 
 La portada utiliza una foto panorámica original WebP almacenada en GitHub. CineGraph prioriza películas reales de MovieLens con fotos de TMDB, y muestra diez pósteres de películas identificadas por su `movieId` aunque todavía no tengas un token. Para ampliar la cobertura hay un [importador local de TMDB](docs/posters-tmdb-local.md), que cruza `links.csv` original (MD5) y actualiza sólo `movies.poster_url` en PostgreSQL. No modifica GraphSAGE A9 ni requiere AWS.

@@ -100,3 +100,15 @@ No utilizar `scripts/ml/run_a9_s3.py`: era una preparación prematura para AWS r
 ## Autenticación, MovieLens real y publicación A9
 
 La interfaz ahora usa sesiones privadas, catálogo MovieLens 32M verificado y filas horizontales. El `baseline-v0` anterior se elimina mediante el bootstrap sin borrar interacciones. La inferencia GraphSAGE de Miguel y la publicación a PostgreSQL siguen siendo pasos manuales. [Guía completa](cinegraph-login-real-a9.md).
+
+## 7. Transformar Raw → Curated → Features (local)
+
+El job `behavioral-transform` ya implementa **solo la parte local** de la transformación, sin Glue ni Spark. Lee todos los objetos Raw verificados, filtra y deduplica eventos por UUID, agrupa en UTC y publica los datasets Curated/Features de forma versionada. No modifica los eventos originales ni se ejecuta automáticamente al usar `ship`.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.floci.yml --profile floci run --rm --build behavioral-transform
+docker compose -f docker-compose.yml -f docker-compose.floci.yml --profile floci run --rm behavioral-transform verify
+```
+
+Guía detallada: [transformacion-behavioral-local.md](transformacion-behavioral-local.md). Las salidas son JSONL y agregados diarios para analítica; **no se incorporan al checkpoint original de A9 ni generan scoring en cada clic**.
+
