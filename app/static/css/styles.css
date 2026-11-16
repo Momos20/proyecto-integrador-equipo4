@@ -37,3 +37,32 @@
   .hero h1{font-size:clamp(44px,10vw,69px)}
   .footer-credits{align-items:flex-start;text-align:left}
 }
+
+
+/* Buscador cinematográfico en el encabezado, desplegable sin tapar el perfil. */
+.header-search{position:relative;flex:0 0 auto;z-index:102}
+.search-toggle{display:grid;place-items:center;width:42px;height:42px;border:1px solid transparent;border-radius:7px;background:transparent;color:#f0f0f0;padding:7px;transition:background .2s}
+.search-toggle:hover,.search-toggle[aria-expanded="true"]{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.16)}
+.search-panel{position:absolute;right:0;top:calc(100% + 12px);width:min(425px,calc(100vw - 32px));padding:20px;background:#181a1d;border:1px solid rgba(255,255,255,.19);border-radius:11px;box-shadow:0 22px 60px rgba(0,0,0,.62)}
+.search-panel>label{display:block;font:750 13px "DM Sans",sans-serif;margin-bottom:12px}
+.search-field{display:flex;align-items:center;gap:10px;padding:0 11px;background:#0b0d10;border:1px solid #56585b;border-radius:7px;height:46px}
+.search-field:focus-within{border-color:#f5f5f5}
+.search-field>svg{flex-shrink:0;color:#afb1b3}
+.search-field>input{min-width:0;width:100%;flex:1;background:transparent;border:0;outline:0;color:#fff;font-size:13px}
+.search-field>input::placeholder{color:#909397}
+.search-field>input::-webkit-search-cancel-button{display:none}
+.search-clear{border:0;background:transparent;color:#e2e2e2;font-size:15px;line-height:1;padding:9px}
+.search-panel>small{display:block;color:#a4a6a8;font-size:11px;line-height:1.5;margin-top:10px}
+.search-results-section{padding-top:44px;padding-bottom:28px}
+.search-results-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:22px 15px;padding:0 var(--pad) 20px;align-items:start}
+.search-results-grid .movie-card{min-width:0;width:100%;flex:auto}
+.search-status{color:#bec0c2;font-size:13px;padding:0 var(--pad);margin:4px 0 19px;min-height:20px}
+@media(max-width:950px){.search-results-grid{grid-template-columns:repeat(auto-fill,minmax(145px,1fr))}}
+@media(max-width:650px){
+  .header-search{margin-left:auto}
+  .search-toggle{width:32px;height:36px;padding:5px}
+  .search-panel{position:fixed;top:66px;left:12px;right:12px;width:auto;padding:15px}
+  .search-results-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 10px}
+  .search-results-section{padding-top:25px}
+  .account-area{margin-left:0}
+}

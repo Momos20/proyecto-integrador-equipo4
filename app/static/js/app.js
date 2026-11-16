@@ -156,6 +156,114 @@ async function sendInteraction(card, action, rating, control) {
   finally { state.busy = false; if (control) control.disabled = false; }
 }
 
+
+/* Búsqueda tipo Netflix: título real de MovieLens, sin inferencia A9 ni resultados inventados. */
+let searchTimer = null;
+let searchController = null;
+let searchGeneration = 0;
+let searchHasScrolled = false;
+
+function openMovieSearch() {
+  $("searchPanel").hidden = false;
+  $("searchToggle").setAttribute("aria-expanded", "true");
+  $("movieSearchInput").focus();
+}
+
+function resetMovieSearch() {
+  clearTimeout(searchTimer);
+  if (searchController) searchController.abort();
+  searchGeneration++;
+  searchHasScrolled = false;
+  $("movieSearchInput").value = "";
+  $("clearMovieSearch").hidden = true;
+  $("searchStatus").textContent = "";
+  $("searchResultsGrid").replaceChildren();
+  $("searchResultsSection").hidden = true;
+}
+
+function closeMovieSearch({ restoreFocus = true } = {}) {
+  resetMovieSearch();
+  $("searchPanel").hidden = true;
+  $("searchToggle").setAttribute("aria-expanded", "false");
+  if (restoreFocus) $("searchToggle").focus();
+}
+
+async function performMovieSearch(query, generation) {
+  const controller = new AbortController();
+  searchController = controller;
+  const params = new URLSearchParams({ search: query, limit: "48" });
+  try {
+    const result = await request(`/api/catalog?${params}`, { signal: controller.signal });
+    if (generation !== searchGeneration || $("searchPanel").hidden) return;
+    $("searchResultsGrid").replaceChildren();
+    if (!result.ready) {
+      $("searchStatus").textContent = "El catálogo todavía no está preparado. Comprueba la importación de MovieLens.";
+      return;
+    }
+    const movies = Array.isArray(result.movies) ? result.movies : [];
+    for (const movie of movies) state.catalog.set(Number(movie.movie_id), movie);
+    $("searchResultsGrid").innerHTML = movies.map(movie => movieCard(movie, { surface: "search" })).join("");
+    $("searchStatus").textContent = movies.length
+      ? `${movies.length} película${movies.length === 1 ? "" : "s"} encontrada${movies.length === 1 ? "" : "s"} para «${query}».${movies.length === 48 ? " Mostrando las primeras 48." : ""}`
+      : `No encontramos películas con «${query}». Prueba con otro título.`;
+    if (!searchHasScrolled) {
+      $("searchResultsSection").scrollIntoView({ behavior: "smooth", block: "start" });
+      searchHasScrolled = true;
+    }
+  } catch (error) {
+    if (error.name === "AbortError" || generation !== searchGeneration) return;
+    $("searchStatus").textContent = "No fue posible buscar películas. Comprueba la conexión con CineGraph.";
+  } finally {
+    if (searchController === controller) searchController = null;
+  }
+}
+
+function scheduleMovieSearch({ immediate = false } = {}) {
+  clearTimeout(searchTimer);
+  if (searchController) searchController.abort();
+  const generation = ++searchGeneration;
+  const query = $("movieSearchInput").value.trim();
+  $("clearMovieSearch").hidden = $("movieSearchInput").value.length === 0;
+  if (query.length < 2) {
+    $("searchResultsSection").hidden = true;
+    $("searchResultsGrid").replaceChildren();
+    $("searchStatus").textContent = "";
+    searchHasScrolled = false;
+    return;
+  }
+  $("searchResultsSection").hidden = false;
+  $("searchResultsGrid").replaceChildren();
+  $("searchStatus").textContent = "Buscando películas...";
+  searchTimer = setTimeout(() => performMovieSearch(query, generation), immediate ? 0 : 320);
+}
+
+$("searchToggle").addEventListener("click", () => {
+  if ($("searchPanel").hidden) openMovieSearch();
+  else closeMovieSearch();
+});
+$("movieSearchInput").addEventListener("input", () => scheduleMovieSearch());
+$("movieSearchInput").addEventListener("keydown", event => {
+  if (event.key === "Enter") { event.preventDefault(); scheduleMovieSearch({ immediate: true }); }
+});
+$("clearMovieSearch").addEventListener("click", () => {
+  resetMovieSearch();
+  $("movieSearchInput").focus();
+});
+document.addEventListener("keydown", event => {
+  const target = event.target;
+  if (event.key === "Escape" && !$("searchPanel").hidden) closeMovieSearch();
+  if (event.key === "/" && !event.ctrlKey && !event.metaKey && !event.altKey &&
+      !target.closest("input, textarea, select") && $("loginModal").hidden) {
+    event.preventDefault();
+    openMovieSearch();
+  }
+});
+document.querySelectorAll(".main-nav a, .brand").forEach(link =>
+  link.addEventListener("click", () => {
+    if (!$("searchPanel").hidden) closeMovieSearch({ restoreFocus: false });
+  })
+);
+
 $("openLogin").addEventListener("click", showLogin);
 $("closeLogin").addEventListener("click", hideLogin);
 document.querySelector("[data-close-login]").addEventListener("click", hideLogin);

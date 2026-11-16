@@ -55,3 +55,43 @@ def test_optional_catalog_filters_have_explicit_postgres_types():
         assert f":{field} IS NULL" not in sql
     assert "CAST(:genre AS TEXT) = ANY(genres)" in sql
     assert "CAST(:search AS TEXT)" in sql
+
+
+def test_header_has_netflix_style_movie_search():
+    app = create_app()
+    app.config.update(TESTING=True)
+    html = app.test_client().get("/").get_data(as_text=True)
+    for fragment in ('id="searchToggle"', 'id="searchPanel" hidden',
+                     'id="movieSearchInput"', 'id="searchResultsSection" hidden',
+                     'id="searchResultsGrid"', 'id="searchStatus"'):
+        assert fragment in html
+    assert 'aria-label="Buscar películas"' in html
+    assert 'Descubrir mi Top 10' not in html
+
+
+def test_movie_search_calls_only_real_catalog_endpoint():
+    js = Path("app/static/js/app.js").read_text(encoding="utf-8")
+    assert 'new URLSearchParams({ search: query, limit: "48" })' in js
+    assert 'request(`/api/catalog?${params}`' in js
+    assert 'movieCard(movie, { surface: "search" })' in js
+    assert "new AbortController()" in js
+    assert 'searchGeneration' in js
+    assert 'id="movieSearchInput"' not in js
+    assert 'DEMO_POSTERS' not in js
+
+
+def test_search_api_uses_real_catalog_filter(monkeypatch):
+    from app.routes import api
+    recorded = {}
+    def fake_catalog(**kwargs):
+        recorded.update(kwargs)
+        return {"ready": True, "source": "MovieLens 32M", "count": 0, "movies": []}
+    monkeypatch.setattr(api, "get_catalog", fake_catalog)
+    app = create_app()
+    app.config.update(TESTING=True)
+    response = app.test_client().get("/api/catalog?search=Matrix&limit=48")
+    assert response.status_code == 200
+    assert response.get_json()["source"] == "MovieLens 32M"
+    assert recorded["search"] == "Matrix"
+    assert recorded["limit"] == 48
+    assert app.test_client().get("/api/catalog?search=" + "x" * 101).status_code == 400

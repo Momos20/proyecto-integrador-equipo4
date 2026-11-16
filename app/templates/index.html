@@ -18,6 +18,20 @@
     <div class="topbar-inner">
       <a href="#inicio" class="brand" aria-label="CineGraph, inicio"><span class="brand-emblem">C<span>G</span></span><span>CINE<span class="brand-red">GRAPH</span></span></a>
       <nav class="main-nav" aria-label="Principal"><a href="#inicio">Inicio</a><a href="#paraTi">Para ti</a><a href="#catalogo">Películas</a><a href="#miLista">Mi lista</a></nav>
+      <div class="header-search" id="headerSearch">
+        <button type="button" class="search-toggle" id="searchToggle" aria-label="Buscar películas" aria-expanded="false" aria-controls="searchPanel" title="Buscar películas">
+          <svg viewBox="0 0 24 24" width="23" height="23" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.8" cy="10.8" r="6.8"></circle><path d="m16 16 5 5"></path></svg>
+        </button>
+        <div class="search-panel" id="searchPanel" hidden>
+          <label for="movieSearchInput">Buscar en CineGraph</label>
+          <div class="search-field">
+            <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.8" cy="10.8" r="6.8"></circle><path d="m16 16 5 5"></path></svg>
+            <input type="search" id="movieSearchInput" placeholder="Película, título o año..." maxlength="100" autocomplete="off" spellcheck="false" aria-label="Escribe el título de una película">
+            <button type="button" class="search-clear" id="clearMovieSearch" aria-label="Borrar búsqueda" hidden>✕</button>
+          </div>
+          <small>Escribe al menos 2 caracteres. Buscamos entre los títulos reales de MovieLens 32M.</small>
+        </div>
+      </div>
       <div class="account-area">
         <span id="accountName" class="account-name" hidden></span>
         <button type="button" id="openLogin" class="profile-button">Iniciar sesión</button>
@@ -36,6 +50,15 @@
         <p id="heroAccount" class="hero-account">Explora el catálogo. Inicia sesión para guardar tus gustos y ver tu selección personal.</p>
       </div>
       <div class="hero-bottom" aria-hidden="true"></div>
+    </section>
+
+    <section class="shelf-section search-results-section" id="searchResultsSection" hidden aria-labelledby="searchResultsTitle">
+      <div class="shelf-head">
+        <div><p class="eyebrow-small">EXPLORA EL CATÁLOGO</p><h2 id="searchResultsTitle">Resultados de búsqueda</h2></div>
+        <span class="shelf-caption">Películas reales · MovieLens 32M</span>
+      </div>
+      <p class="search-status" id="searchStatus" role="status" aria-live="polite"></p>
+      <div class="search-results-grid" id="searchResultsGrid"></div>
     </section>
 
     <section class="shelf-section first-shelf" id="paraTi" hidden aria-labelledby="personalTitle">

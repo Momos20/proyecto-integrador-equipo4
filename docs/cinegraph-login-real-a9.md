@@ -91,3 +91,10 @@ docker compose -f docker-compose.yml -f docker-compose.floci.yml --profile floci
 ```
 
 No se necesita una consola AWS. La migración a AWS Academy será posterior. Floci es almacenamiento/streaming emulado, **no SageMaker ni una ejecución mágica del modelo**.
+
+
+## Búsqueda de películas desde el encabezado
+
+El botón con lupa en la barra superior abre un campo de búsqueda estilo Netflix. Al introducir **al menos dos caracteres**, el frontend consulta `GET /api/catalog?search=...` con una espera breve de 320 ms y muestra una cuadrícula de hasta 48 películas reales de MovieLens 32M. Se admiten fragmentos del título y años que formen parte del título. Los resultados no son inferencias ni recomendaciones de A9; proceden exclusivamente del catálogo verificado y respetan las imágenes disponibles. Las acciones de «Me gusta», «Mi lista» y calificar continúan vinculadas a la sesión.
+
+También puedes abrir el buscador pulsando `/` fuera de cualquier campo y cerrarlo con `Escape`. En teléfonos aparece debajo de la barra de navegación. Si todavía no se importó el catálogo, la búsqueda muestra una advertencia en lugar de resultados ficticios.
