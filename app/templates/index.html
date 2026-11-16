@@ -38,7 +38,7 @@
       <div class="hero-bottom" aria-hidden="true"></div>
     </section>
 
-    <section class="shelf-section first-shelf" id="paraTi" aria-labelledby="personalTitle">
+    <section class="shelf-section first-shelf" id="paraTi" hidden aria-labelledby="personalTitle">
       <div class="shelf-head">
         <div><p class="eyebrow-small">HECHO PARA TU PERFIL</p><h2 id="personalTitle">Tu selección personal</h2></div>
         <span class="shelf-caption" id="personalInfo">GraphSAGE A9 · resultados publicados</span>
@@ -47,19 +47,19 @@
       <div class="shelf-track" id="personalRail" aria-label="Recomendaciones personalizadas" hidden></div>
     </section>
 
-    <section class="shelf-section" id="catalogo" aria-labelledby="catalogTitle">
+    <section class="shelf-section" id="catalogo" hidden aria-labelledby="catalogTitle">
       <div class="shelf-head"><div><p class="eyebrow-small">EL CATÁLOGO REAL</p><h2 id="catalogTitle">Películas para explorar</h2></div><span class="shelf-caption">Fuente: MovieLens 32M</span></div>
       <div class="shelf-message" id="catalogStatus" role="status">Cargando catálogo…</div>
       <div id="catalogShelves" class="catalog-shelves"></div>
     </section>
 
-    <section class="shelf-section" id="miLista" aria-labelledby="listTitle">
+    <section class="shelf-section" id="miLista" hidden aria-labelledby="listTitle">
       <div class="shelf-head"><div><p class="eyebrow-small">TU ESPACIO</p><h2 id="listTitle">Mi lista</h2></div><span class="shelf-caption">Guardada en PostgreSQL</span></div>
       <div class="shelf-message" id="watchlistEmpty">Inicia sesión para guardar películas en tu lista.</div>
       <div class="shelf-track" id="watchlistRail" hidden></div>
     </section>
 
-    <section class="project-note" aria-label="Información del proyecto">
+    <section class="project-note" aria-label="Información del proyecto" hidden>
       <div><span class="note-label">DETRÁS DE CINEGRAPH</span><h2>Una experiencia construida con datos, no con rankings inventados.</h2></div>
       <p>El catálogo procede de MovieLens 32M. Las recomendaciones personales solo se muestran después de publicar resultados reales de GraphSAGE A9 de Miguel. Tus interacciones se registran en PostgreSQL y pueden enviarse a Kinesis y S3 con Floci local. No se recalcula el modelo en cada clic.</p>
     </section>

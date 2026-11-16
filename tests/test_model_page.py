@@ -23,3 +23,24 @@ def test_client_consults_only_current_account_and_real_catalog():
     assert '/api/interactions' in js
     assert 'DEMO_POSTERS' not in js
     assert 'CINEGRAPH_DEMO_USER' not in js
+
+
+def test_hero_remains_home_and_empty_sections_are_hidden():
+    app = create_app()
+    app.config.update(TESTING=True)
+    page = app.test_client().get("/").get_data(as_text=True)
+    assert 'class="hero" id="inicio"' in page
+    assert "Una historia más." in page
+    for section in ("paraTi", "catalogo", "miLista"):
+        assert f'id="{section}" hidden' in page
+    assert 'class="project-note" aria-label="Información del proyecto" hidden' in page
+
+
+def test_frontend_reveals_only_shelves_with_real_records():
+    js = Path("app/static/js/app.js").read_text(encoding="utf-8")
+    assert '$("catalogo").hidden = loaded === 0' in js
+    assert '$("paraTi").hidden = false' in js
+    assert '$("miLista").hidden = false' in js
+    assert '$("paraTi").hidden = true' in js
+    assert '$("miLista").hidden = true' in js
+    assert 'window.scrollTo({ top: 0, behavior: "smooth" })' in js

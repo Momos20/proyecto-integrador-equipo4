@@ -68,6 +68,9 @@ function makeShelf(key, name, movies) {
 }
 async function loadCatalog() {
   const container = $("catalogShelves");
+  // La portada permanece visible; no presentar tarjetas de error si no hay catálogo.
+  $("catalogo").hidden = true;
+  container.replaceChildren();
   const results = await Promise.allSettled(rails.map(async (row) => {
     const query = new URLSearchParams({ limit: "18" });
     if (row.genre) query.set("genre", row.genre);
@@ -83,12 +86,15 @@ async function loadCatalog() {
     if (!ready) { pendingSetup = true; continue; }
     if (movies.length) { container.appendChild(makeShelf(row.id, row.title, movies)); loaded++; }
   }
-  $("catalogStatus").hidden = loaded > 0;
-  if (!loaded) $("catalogStatus").textContent = pendingSetup
-    ? "El catálogo verificado de MovieLens todavía no se ha importado. Ejecuta el bootstrap local indicado en la guía del proyecto."
-    : "No fue posible cargar el catálogo. Revisa la base de datos.";
+  $("catalogStatus").hidden = true;
+  $("catalogo").hidden = loaded === 0;
+  // No fabricar películas ni mostrar una estantería vacía como si fuese contenido.
+  if (!loaded) console.info(pendingSetup
+    ? "CineGraph: el catálogo original todavía no se ha importado."
+    : "CineGraph: el catálogo no está disponible.");
 }
 async function loadRecommendations() {
+  $("paraTi").hidden = true;
   $("personalRail").hidden = true;
   $("personalEmpty").hidden = false;
   state.ranking = null;
@@ -102,6 +108,7 @@ async function loadRecommendations() {
     $("personalRail").innerHTML = data.recommendations.map(m => movieCard(m,{rank:true,surface:"a9"})).join("");
     $("personalRail").hidden = false;
     $("personalEmpty").hidden = true;
+    $("paraTi").hidden = false;
     $("personalInfo").textContent = `GraphSAGE A9 · corte ${data.cutoff_date} · datos reales`;
   } catch (error) {
     $("personalEmpty").textContent = error.status === 404
@@ -110,6 +117,7 @@ async function loadRecommendations() {
   }
 }
 async function loadWatchlist() {
+  $("miLista").hidden = true;
   $("watchlistRail").hidden = true;
   $("watchlistEmpty").hidden = false;
   if (!state.user) { $("watchlistEmpty").textContent = "Inicia sesión para ver tu lista."; return; }
@@ -124,6 +132,7 @@ async function loadWatchlist() {
     if (!list.length) { $("watchlistEmpty").textContent = "Las películas que guardes aparecerán aquí."; return; }
     $("watchlistRail").innerHTML = list.map(m => movieCard(m,{surface:"watchlist"})).join("");
     $("watchlistRail").hidden = false; $("watchlistEmpty").hidden = true;
+    $("miLista").hidden = false;
   } catch (_error) { $("watchlistEmpty").textContent = "No fue posible consultar tu lista."; }
 }
 async function sendInteraction(card, action, rating, control) {
@@ -157,7 +166,12 @@ $("loginForm").addEventListener("submit", async e => {
     const data = await request("/api/auth/login", { method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({username:$("loginUsername").value,password:$("loginPassword").value}) });
     state.user = data.user; state.csrf = data.csrf_token;
-    hideLogin(); renderAuth(); await Promise.all([loadRecommendations(), loadWatchlist()]); toast(`Bienvenido, ${state.user.username}.`);
+    hideLogin(); renderAuth();
+    // Tras entrar, presentar la portada cinematográfica de Inicio, no las secciones vacías.
+    if (window.location.hash) window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    await Promise.all([loadRecommendations(), loadWatchlist()]);
+    toast(`Bienvenido, ${state.user.username}.`);
   } catch (error) { $("loginError").textContent = error.message; $("loginError").hidden = false; }
   finally { $("loginSubmit").disabled = false; }
 });
@@ -189,6 +203,8 @@ window.addEventListener("scroll", () => $("topbar").classList.toggle("is-scrolle
   try { const data = await request("/api/auth/me"); state.csrf = data.csrf_token; state.user = data.user || null; }
   catch (_error) { $("catalogStatus").textContent = "El servidor aún no está preparado. Ejecuta el bootstrap local."; }
   renderAuth();
+  // Reapertura de sesión: la experiencia comienza en la portada, sin saltar a estanterías.
+  if (state.user && !window.location.hash) window.scrollTo(0, 0);
   await loadCatalog();
   await Promise.all([loadRecommendations(),loadWatchlist()]);
 })();
