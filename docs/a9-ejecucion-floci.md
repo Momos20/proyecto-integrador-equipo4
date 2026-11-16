@@ -82,3 +82,8 @@ Cuando termine la validación local, se mapeará el almacenamiento emulado a S3 
 ## Publicación manual en CineGraph sin simulaciones
 
 El runner ahora anota `predicciones_sha256` en el manifiesto. `a9-publish` lee exclusivamente JSON y manifiesto de A9 bajo S3 Floci, verifica el checksum del resultado, del checkpoint y que se ejecutaron las pruebas originales, y guarda posiciones y scores verdaderos en PostgreSQL. El frontend solo los presenta después de iniciar sesión. Sin resultados A9 publicados, aparece un mensaje de ausencia, nunca una predicción falsa. [Guía](cinegraph-login-real-a9.md).
+
+
+## Datos behavioral de 2026: integración experimental shadow
+
+La inferencia histórica A9 del 15 de junio de 2023 ya se ejecutó y publicó en la aplicación local; esto **no valida nuevas predicciones en 2026**. El preparador `a9-feedback-stage` ahora selecciona solo ratings explícitos previos al corte y conserva las features observacionales aparte. El runner opcional `run_a9_shadow.py` reconstruye el grafo sobre una copia en memoria con usuarios CineGraph remapeados a IDs distintos de MovieLens, sin cambiar el checkpoint original ni publicar rankings nuevos. [Protocolo y comandos](orquestacion-y-shadow-local.md).

@@ -45,3 +45,7 @@ python -m pytest -q tests/test_behavioral_transform.py
 ```
 
 Las pruebas utilizan un S3 simulado en memoria y verifican deduplicación, datos corruptos, filtros de seguridad, agregación, repetición idempotente, integridad y UTC; no necesitan AWS ni credenciales.
+
+## Uso en el orquestador y preparación para A9
+
+Este ETL ahora forma parte de un flujo controlado de seis etapas: envío, verificación Raw, transformación, verificación Curated/Features, staging de feedback previo al corte UTC y verificación de snapshot shadow. No se alteran las tablas PostgreSQL ni los tensores originales A9. [Guía](orquestacion-y-shadow-local.md).

@@ -48,6 +48,19 @@ services:
         condition: service_started
     command: ["run"]
 
+  a9-feedback-stage:
+    profiles: ["floci"]
+    build:
+      context: .
+      dockerfile: infrastructure/docker/behavioral-feedback.Dockerfile
+    environment:
+      # Acceso a S3 EXCLUSIVAMENTE local por el emulador Floci.
+      AWS_ENDPOINT_URL: http://floci:4566
+    depends_on:
+      floci:
+        condition: service_started
+    command: ["run"]
+
   a9-publish:
     profiles: ["floci"]
     build:

@@ -56,7 +56,7 @@ La [guía de datos para A9](data/reference/movielens32m/README.md) incluye el co
 
 Miguel entregó los archivos de `A0_base` y `A9_sin_id`, organizados en [`ml/models/`](ml/models/README.md). **A9 contiene un checkpoint `modelo.pt`** y métricas de validación registradas (Recall@20 0.138956; NDCG@20 0.091508 en el paso 1600). **A0 solo tiene su curva**. Se conservaron los archivos originales.
 
-El código original de Miguel `A9_topk_diario` está en [`ml/a9_daily/`](ml/a9_daily/), con pruebas y métricas históricas. Los pesos están en `ml/models/A9_sin_id/modelo.pt`, sin modificación. Se dispone del ejecutor local `scripts/ml/run_a9_floci.py` y del publicador `scripts/ml/publish_a9_local.py`, pero **todavía no afirmamos que el scoring se haya ejecutado en el Mac ni que existan recomendaciones personales publicadas**. La aplicación no sustituye la ausencia de A9 con `baseline-v0` ni otros rankings ficticios.
+El código original de Miguel `A9_topk_diario` está en [`ml/a9_daily/`](ml/a9_daily/), con pruebas y métricas históricas. Los pesos están en `ml/models/A9_sin_id/modelo.pt`, sin modificación. Se dispone del ejecutor local `scripts/ml/run_a9_floci.py` y del publicador `scripts/ml/publish_a9_local.py`, y la inferencia histórica A9 de 2023-06-15 ya fue ejecutada en el Mac del equipo, con 30 recomendaciones reales de tres usuarios publicadas en PostgreSQL local. La aplicación no sustituye la ausencia de A9 con `baseline-v0` ni otros rankings ficticios.
 
 El workflow CI de GitHub Actions permanece disponible **solo mediante ejecución manual** desde «Run workflow»; un push o PR no lo dispara.
 
@@ -164,7 +164,7 @@ python scripts/ml/run_a9_floci.py \
   --fecha 2023-06-15 --usuarios 123 456 --k 10
 ```
 
-Detalles y requisitos: [`docs/a9-ejecucion-floci.md`](docs/a9-ejecucion-floci.md). Los ratings y resultados Top-K se almacenan en **S3 local de Floci**, no en GitHub ni en AWS real. Las recomendaciones aún no alimentan PostgreSQL; la conexión A9 → app es una fase posterior.
+Detalles y requisitos: [`docs/a9-ejecucion-floci.md`](docs/a9-ejecucion-floci.md). Los ratings y resultados Top-K se almacenan en **S3 local de Floci**, no en GitHub ni en AWS real. El ranking histórico 2023-06-15 ya alimenta PostgreSQL local; el feedback real posterior se separa en un proceso experimental shadow.
 
 ## Streaming en AWS
 
@@ -211,6 +211,18 @@ docker compose -f docker-compose.yml -f docker-compose.floci.yml --profile floci
 
 Guía, esquema y controles: [docs/transformacion-behavioral-local.md](docs/transformacion-behavioral-local.md).
 
+## Orquestación unificada y feedback futuro para A9
+
+El laboratorio dispone de un único proceso local fail-fast de seis pasos: **ship → verificar Raw → transformar → verificar Curated/Features → preparar A9 shadow → verificar A9 shadow**. Cada etapa registra su resultado y su salida en `artifacts/pipeline-runs/` (ignorado por Git); si falla una etapa se detiene inmediatamente.
+
+```bash
+python3 scripts/local_aws/orchestrate_local.py --cutoff 2026-11-17
+```
+
+El staging solo admite calificaciones explícitas antes del inicio del día UTC del corte, conserva aparte las features de likes/watchlist y separa las cuentas `cine123/cine414/cine456` de los usuarios MovieLens con el mismo número. El ranking A9 de junio de 2023 queda intacto. Opcionalmente, tras confirmar que existe al menos un rating nuevo, el comando **manual** `python scripts/ml/run_a9_shadow.py --cutoff 2026-11-17` usa el checkpoint original para un experimento *shadow* aislado; NO publica ese ranking en el servicio. La evaluación de 2026 y el objetivo de siete días aún no están validados.
+
+[Guía completa, esquema, trazabilidad y limitaciones](docs/orquestacion-y-shadow-local.md).
+
 ## Pósteres reales y portada cinematográfica
 
 La portada utiliza una foto panorámica original WebP almacenada en GitHub. CineGraph prioriza películas reales de MovieLens con fotos de TMDB, y muestra diez pósteres de películas identificadas por su `movieId` aunque todavía no tengas un token. Para ampliar la cobertura hay un [importador local de TMDB](docs/posters-tmdb-local.md), que cruza `links.csv` original (MD5) y actualiza sólo `movies.poster_url` en PostgreSQL. No modifica GraphSAGE A9 ni requiere AWS.
@@ -252,7 +264,7 @@ Actualmente solo se mantiene `main` en el repositorio remoto, por decisión del 
 
 ## Estado del proyecto
 
-MVP Flask + PostgreSQL con feedback operacional funcional. El backend produce clickstream JSONL y el repositorio incluye configuración de Kinesis Agent. El catálogo original y las cuentas locales están preparados mediante un bootstrap manual. El frontend no muestra predicciones ficticias y la API solo consulta A9 publicado con manifiesto verificable. **La ejecución de GraphSAGE A9 sobre MovieLens 32M y la publicación resultante todavía requieren ejecución en el Mac del equipo.** Se conservan los pesos y el protocolo de Miguel. Floci es la fase actual; AWS Academy vendrá después.
+MVP Flask + PostgreSQL con feedback operacional funcional. El backend produce clickstream JSONL y el repositorio incluye configuración de Kinesis Agent. El catálogo original y las cuentas locales están preparados mediante un bootstrap manual. El frontend no muestra predicciones ficticias y la API solo consulta A9 publicado con manifiesto verificable. **La inferencia histórica y publicación A9 en PostgreSQL ya se verificaron en el Mac; Raw → Curated → Features también se comprobó en Floci local.** Se conservan los pesos y el protocolo de Miguel. Floci es la fase actual; AWS Academy vendrá después.
 
 ## Equipo 4
 

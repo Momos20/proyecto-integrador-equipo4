@@ -112,3 +112,13 @@ docker compose -f docker-compose.yml -f docker-compose.floci.yml --profile floci
 
 Guía detallada: [transformacion-behavioral-local.md](transformacion-behavioral-local.md). Las salidas son JSONL y agregados diarios para analítica; **no se incorporan al checkpoint original de A9 ni generan scoring en cada clic**.
 
+
+## 8. Orquestación local y staging de feedback para A9
+
+Puede ejecutarse el ciclo completo de captura y transformación hasta un snapshot shadow verificable con una sola orden, con registros y detención ante fallos:
+
+```bash
+python3 scripts/local_aws/orchestrate_local.py --cutoff 2026-11-17
+```
+
+El staging no mezcla los usuarios CineGraph de 2026 con IDs históricos MovieLens ni activa automáticamente GraphSAGE. Los ratings explícitos pueden probarse manualmente con A9 en un entorno shadow. [Guía de orquestación y validación temporal](orquestacion-y-shadow-local.md).
