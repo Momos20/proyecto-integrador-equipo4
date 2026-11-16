@@ -22,6 +22,12 @@ KNOWN_TMDB_POSTERS = {
     318: "https://image.tmdb.org/t/p/w500/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg",
     356: "https://image.tmdb.org/t/p/w500/arw2vcBveWOVZr6pxd9XTd1TdQa.jpg",
     296: "https://image.tmdb.org/t/p/w500/d5iIlFn5s0ImszYzBPb8JPIfbXD.jpg",
+    # Cuatro películas que aparecen en el Top-10 real de cine123 (corte 2023-06-15).
+    # Rutas identificadas públicamente para las obras indicadas, sin inferir imágenes.
+    109487: "https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg",  # Interstellar (2014)
+    50872: "https://image.tmdb.org/t/p/w500/a7hjVvftDqdgqZidGyoDkpXWjtK.jpg",   # Ratatouille (2007)
+    68954: "https://image.tmdb.org/t/p/w500/c9QLSX3qEW8FO7UgT2pyfC1LDzb.jpg",   # Up (2009)
+    134130: "https://image.tmdb.org/t/p/w500/3ndAx3weG6KDkJIRMCi5vXX6Dyb.jpg", # The Martian (2015)
 }
 KNOWN_POSTER_IDS = sorted(KNOWN_TMDB_POSTERS)
 

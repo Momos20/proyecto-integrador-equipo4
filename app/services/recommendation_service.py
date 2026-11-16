@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Any
 from sqlalchemy import text
 from app.db import get_engine
+from app.services.catalog_service import KNOWN_TMDB_POSTERS
 
 A9_VERSION = "a9-miguel-diario"
 RECOMMENDATIONS_SQL = text("""
@@ -51,7 +52,8 @@ def get_recommendations(user_id: int, limit: int = 10) -> dict[str, Any] | None:
         "recommendations": [{
             "movie_id": row["movie_id"], "title": row["title"],
             "release_year": row["release_year"], "genres": list(row["genres"] or []),
-            "poster_url": row["poster_url"], "rank": row["rank"],
+            "poster_url": row["poster_url"] or KNOWN_TMDB_POSTERS.get(int(row["movie_id"])),
+            "rank": row["rank"],
             "score": round(float(row["score"]), 6),
         } for row in rows],
     }
