@@ -28,7 +28,7 @@
 
   <main>
     <section class="hero" id="inicio">
-      <div class="hero-visual" aria-hidden="true"><div class="hero-halo"></div><div class="hero-monogram">CINE<br><span>GRAPH.</span></div></div>
+      <div class="hero-visual" aria-hidden="true"></div>
       <div class="hero-content">
         <div class="hero-eyebrow"><span></span> EL CINE TIENE OTRA FORMA DE ENCONTRARTE</div>
         <h1>Una historia más.<br><em>Una que sea tuya.</em></h1>
@@ -65,7 +65,18 @@
     </section>
   </main>
 
-  <footer class="footer"><span>CINE<span class="brand-red">GRAPH</span></span><small>Proyecto integrador · Equipo 4 · MovieLens 32M · GraphSAGE</small></footer>
+  <footer class="footer">
+    <span>CINE<span class="brand-red">GRAPH</span></span>
+    <div class="footer-credits">
+      <small>Proyecto integrador · Equipo 4 · MovieLens 32M · GraphSAGE</small>
+      <small class="tmdb-credit">
+        <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer">
+          <img src="https://www.themoviedb.org/assets/2/v4/logos/v2/blue_short.svg" alt="TMDB" loading="lazy">
+        </a>
+        Este producto utiliza la API de TMDB, pero TMDB no lo respalda ni certifica.
+      </small>
+    </div>
+  </footer>
 
   <div id="loginModal" class="modal" hidden>
     <div class="modal-overlay" data-close-login></div>
