@@ -200,6 +200,10 @@ docs/data/clickstream_schema.md
 └── .github/workflows/      # CI/CD
 ```
 
+## Pósteres reales y portada cinematográfica
+
+La portada utiliza una foto panorámica original WebP almacenada en GitHub. CineGraph prioriza películas reales de MovieLens con fotos de TMDB, y muestra diez pósteres de películas identificadas por su `movieId` aunque todavía no tengas un token. Para ampliar la cobertura hay un [importador local de TMDB](docs/posters-tmdb-local.md), que cruza `links.csv` original (MD5) y actualiza sólo `movies.poster_url` en PostgreSQL. No modifica GraphSAGE A9 ni requiere AWS.
+
 ## Desarrollo local
 
 Después de iniciar la aplicación, ejecuta **una sola vez** `docker compose --profile setup run --rm local-setup`. El bootstrap importa 87.585 películas auténticas, aplica la migración de cuentas y retira el seed anterior sin borrar interacciones. Guarda las claves que se mostrarán en Terminal. [Pasos completos](docs/cinegraph-login-real-a9.md).

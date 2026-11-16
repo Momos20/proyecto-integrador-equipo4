@@ -57,6 +57,26 @@ services:
     entrypoint: ["python"]
     command: ["/app/scripts/local_setup/bootstrap.py"]
 
+  poster-enrich:
+    profiles: ["setup"]
+    build:
+      context: .
+      dockerfile: infrastructure/docker/app.Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://recommender:recommender@db:5432/recommender
+      CINEGRAPH_LOCAL_SETUP: "1"
+      PYTHONPATH: /app
+      TMDB_READ_TOKEN: ${TMDB_READ_TOKEN:-}
+      TMDB_API_KEY: ${TMDB_API_KEY:-}
+    volumes:
+      - ./scripts/local_setup:/app/scripts/local_setup:ro
+      - ./data/reference/movielens32m:/app/data/reference/movielens32m:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["python", "/app/scripts/local_setup/enrich_posters.py"]
+    command: ["--limit", "120"]
+
   kinesis-agent:
     profiles: ["aws-streaming"]
     build:
