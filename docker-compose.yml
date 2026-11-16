@@ -45,6 +45,8 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://recommender:recommender@db:5432/recommender
       CINEGRAPH_LOCAL_SETUP: "1"
+      # Ejecutar scripts montados en /app/scripts desde el directorio /app.
+      PYTHONPATH: /app
     volumes:
       - ./database/migrations:/app/database/migrations:ro
       - ./scripts/local_setup:/app/scripts/local_setup:ro

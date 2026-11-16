@@ -78,6 +78,7 @@ def main():
             cur.execute("""
                 INSERT INTO movies (movie_id, title, release_year, genres)
                 SELECT movie_id,title,release_year,genres FROM _incoming_movies
+                WHERE TRUE
                 ON CONFLICT(movie_id) DO UPDATE SET
                   title=EXCLUDED.title, release_year=EXCLUDED.release_year,
                   genres=EXCLUDED.genres,updated_at=NOW()
