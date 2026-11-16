@@ -3,7 +3,7 @@
 // CineGraph: películas leídas de PostgreSQL (catálogo verificado MovieLens 32M).
 // Nunca insertamos títulos, pósteres ni rankings de prueba en el cliente.
 const $ = (id) => document.getElementById(id);
-const state = { user: null, csrf: null, catalog: new Map(), ranking: null, busy: false };
+const state = { user: null, csrf: null, catalog: new Map(), ranking: null, busy: false, authEpoch: 0 };
 const rails = [
   { id: "new", title: "Cine destacado del catálogo", genre: null },
   { id: "action", title: "Acción y aventura", genre: "Action" },
@@ -33,6 +33,7 @@ async function request(url, options = {}) {
 function showLogin() { $("loginModal").hidden = false; document.body.classList.add("modal-open"); $("loginError").hidden = true; $("loginUsername").focus(); }
 function hideLogin() { $("loginModal").hidden = true; document.body.classList.remove("modal-open"); $("loginPassword").value = ""; }
 function renderAuth() {
+  document.documentElement.classList.toggle("guest-mode", !state.user);
   $("openLogin").hidden = Boolean(state.user);
   $("logoutButton").hidden = !state.user;
   $("accountName").hidden = !state.user;
@@ -41,6 +42,26 @@ function renderAuth() {
     ? `Hola, ${state.user.username}. Tu experiencia está vinculada exclusivamente a tu perfil.`
     : "Explora el catálogo. Inicia sesión para guardar tus gustos y ver tu selección personal.";
 }
+function clearAuthenticatedViews() {
+  // Cerrar búsquedas y descartar respuestas en vuelo de una sesión ya finalizada.
+  closeMovieSearch({ restoreFocus: false });
+  state.catalog.clear();
+  state.ranking = null;
+  state.busy = false;
+  $("catalogShelves").replaceChildren();
+  $("catalogStatus").textContent = "Cargando catálogo…";
+  $("catalogStatus").hidden = false;
+  $("personalRail").replaceChildren();
+  $("personalRail").hidden = true;
+  $("personalEmpty").hidden = false;
+  $("personalEmpty").textContent = "Inicia sesión para consultar tu selección personal.";
+  $("watchlistRail").replaceChildren();
+  $("watchlistRail").hidden = true;
+  $("watchlistEmpty").hidden = false;
+  $("watchlistEmpty").textContent = "Inicia sesión para ver tu lista.";
+  for (const id of ["searchResultsSection", "paraTi", "catalogo", "miLista"]) $(id).hidden = true;
+}
+
 function movieCard(movie, {rank = false, surface = "catalog"} = {}) {
   const img = posterUrl(movie.poster_url);
   const title = safe(movie.title);
@@ -67,18 +88,22 @@ function makeShelf(key, name, movies) {
   return section;
 }
 async function loadCatalog() {
+  const requestEpoch = state.authEpoch;
   const container = $("catalogShelves");
-  // La portada permanece visible; no presentar tarjetas de error si no hay catálogo.
   $("catalogo").hidden = true;
   container.replaceChildren();
+  // Las estanterías son privadas; a la persona invitada solo se le muestra la portada.
+  if (!state.user) return;
   const results = await Promise.allSettled(rails.map(async (row) => {
     const query = new URLSearchParams({ limit: "18" });
     if (row.genre) query.set("genre", row.genre);
     const data = await request(`/api/catalog?${query}`);
+    if (requestEpoch !== state.authEpoch || !state.user) return {row, ready: false, movies: []};
     if (!data.ready) return {row, ready: false, movies: []};
     for (const movie of data.movies) state.catalog.set(Number(movie.movie_id), movie);
     return {row, ready: true, movies: data.movies};
   }));
+  if (requestEpoch !== state.authEpoch || !state.user) return;
   let loaded = 0; let pendingSetup = false;
   for (const r of results) {
     if (r.status !== "fulfilled") continue;
@@ -94,6 +119,7 @@ async function loadCatalog() {
     : "CineGraph: el catálogo no está disponible.");
 }
 async function loadRecommendations() {
+  const requestEpoch = state.authEpoch;
   $("paraTi").hidden = true;
   $("personalRail").hidden = true;
   $("personalEmpty").hidden = false;
@@ -102,6 +128,7 @@ async function loadRecommendations() {
   $("personalEmpty").textContent = "Consultando tus recomendaciones…";
   try {
     const data = await request("/api/recommendations?limit=10");
+    if (requestEpoch !== state.authEpoch || !state.user) return;
     if (data.model?.version !== "a9-miguel-diario" || !Array.isArray(data.recommendations) || !data.recommendations.length) throw new Error("No hay predicciones A9 publicadas para tu cuenta.");
     state.ranking = data;
     for (const movie of data.recommendations) state.catalog.set(Number(movie.movie_id), movie);
@@ -111,18 +138,21 @@ async function loadRecommendations() {
     $("paraTi").hidden = false;
     $("personalInfo").textContent = `GraphSAGE A9 · corte ${data.cutoff_date} · datos reales`;
   } catch (error) {
+    if (requestEpoch !== state.authEpoch || !state.user) return;
     $("personalEmpty").textContent = error.status === 404
       ? "Todavía no se han publicado recomendaciones de GraphSAGE A9 para este usuario. Puedes explorar el catálogo mientras tanto."
       : "No fue posible consultar el ranking de tu cuenta. Vuelve a intentarlo más tarde.";
   }
 }
 async function loadWatchlist() {
+  const requestEpoch = state.authEpoch;
   $("miLista").hidden = true;
   $("watchlistRail").hidden = true;
   $("watchlistEmpty").hidden = false;
   if (!state.user) { $("watchlistEmpty").textContent = "Inicia sesión para ver tu lista."; return; }
   try {
     const result = await request("/api/interactions?limit=100");
+    if (requestEpoch !== state.authEpoch || !state.user) return;
     const seen = new Set(); const list = [];
     for (const row of result.interactions) {
       if (row.interaction_type !== "watchlist" || seen.has(Number(row.movie_id))) continue;
@@ -133,7 +163,9 @@ async function loadWatchlist() {
     $("watchlistRail").innerHTML = list.map(m => movieCard(m,{surface:"watchlist"})).join("");
     $("watchlistRail").hidden = false; $("watchlistEmpty").hidden = true;
     $("miLista").hidden = false;
-  } catch (_error) { $("watchlistEmpty").textContent = "No fue posible consultar tu lista."; }
+  } catch (_error) {
+    if (requestEpoch === state.authEpoch && state.user) $("watchlistEmpty").textContent = "No fue posible consultar tu lista.";
+  }
 }
 async function sendInteraction(card, action, rating, control) {
   if (!state.user) { showLogin(); return; }
@@ -164,6 +196,7 @@ let searchGeneration = 0;
 let searchHasScrolled = false;
 
 function openMovieSearch() {
+  if (!state.user) { showLogin(); return; }
   $("searchPanel").hidden = false;
   $("searchToggle").setAttribute("aria-expanded", "true");
   $("movieSearchInput").focus();
@@ -194,7 +227,7 @@ async function performMovieSearch(query, generation) {
   const params = new URLSearchParams({ search: query, limit: "48" });
   try {
     const result = await request(`/api/catalog?${params}`, { signal: controller.signal });
-    if (generation !== searchGeneration || $("searchPanel").hidden) return;
+    if (!state.user || generation !== searchGeneration || $("searchPanel").hidden) return;
     $("searchResultsGrid").replaceChildren();
     if (!result.ready) {
       $("searchStatus").textContent = "El catálogo todavía no está preparado. Comprueba la importación de MovieLens.";
@@ -219,6 +252,7 @@ async function performMovieSearch(query, generation) {
 }
 
 function scheduleMovieSearch({ immediate = false } = {}) {
+  if (!state.user) { closeMovieSearch({ restoreFocus: false }); return; }
   clearTimeout(searchTimer);
   if (searchController) searchController.abort();
   const generation = ++searchGeneration;
@@ -259,7 +293,13 @@ document.addEventListener("keydown", event => {
   }
 });
 document.querySelectorAll(".main-nav a, .brand").forEach(link =>
-  link.addEventListener("click", () => {
+  link.addEventListener("click", event => {
+    // Mantener las opciones visibles como en la portada, pero exigir sesión antes de entrar.
+    if (!state.user && link.getAttribute("href") !== "#inicio") {
+      event.preventDefault();
+      showLogin();
+      return;
+    }
     if (!$("searchPanel").hidden) closeMovieSearch({ restoreFocus: false });
   })
 );
@@ -273,20 +313,36 @@ $("loginForm").addEventListener("submit", async e => {
   try {
     const data = await request("/api/auth/login", { method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({username:$("loginUsername").value,password:$("loginPassword").value}) });
+    state.authEpoch += 1;
     state.user = data.user; state.csrf = data.csrf_token;
     hideLogin(); renderAuth();
     // Tras entrar, presentar la portada cinematográfica de Inicio, no las secciones vacías.
     if (window.location.hash) window.history.replaceState(null, "", window.location.pathname + window.location.search);
     window.scrollTo({ top: 0, behavior: "smooth" });
-    await Promise.all([loadRecommendations(), loadWatchlist()]);
-    toast(`Bienvenido, ${state.user.username}.`);
+    await Promise.all([loadCatalog(), loadRecommendations(), loadWatchlist()]);
+    if (state.user) toast(`Bienvenido, ${state.user.username}.`);
   } catch (error) { $("loginError").textContent = error.message; $("loginError").hidden = false; }
   finally { $("loginSubmit").disabled = false; }
 });
 $("logoutButton").addEventListener("click", async () => {
-  try { const data = await request("/api/auth/logout",{method:"POST"});state.csrf=data.csrf_token;
-    state.user=null;state.ranking=null;renderAuth();await Promise.all([loadRecommendations(),loadWatchlist()]);toast("Sesión cerrada."); }
-  catch(e){ toast(e.message); }
+  $("logoutButton").disabled = true;
+  try {
+    const data = await request("/api/auth/logout", { method: "POST" });
+    state.authEpoch += 1;
+    state.user = null;
+    state.csrf = data.csrf_token;
+    clearAuthenticatedViews();
+    renderAuth();
+    hideLogin();
+    // Quitar #paraTi, #catalogo o #miLista y volver al inicio visible de la portada.
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    window.scrollTo({ top: 0, behavior: "instant" });
+    toast("Sesión cerrada.");
+  } catch (error) {
+    toast(error.message || "No se pudo cerrar sesión.");
+  } finally {
+    $("logoutButton").disabled = false;
+  }
 });
 document.addEventListener("click", (event) => {
   const nav = event.target.closest(".shelf-arrow");
@@ -313,6 +369,9 @@ window.addEventListener("scroll", () => $("topbar").classList.toggle("is-scrolle
   renderAuth();
   // Reapertura de sesión: la experiencia comienza en la portada, sin saltar a estanterías.
   if (state.user && !window.location.hash) window.scrollTo(0, 0);
-  await loadCatalog();
-  await Promise.all([loadRecommendations(),loadWatchlist()]);
+  if (state.user) {
+    await Promise.all([loadCatalog(), loadRecommendations(), loadWatchlist()]);
+  } else {
+    clearAuthenticatedViews();
+  }
 })();

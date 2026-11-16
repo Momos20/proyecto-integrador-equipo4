@@ -1,11 +1,12 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" class="guest-mode">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#090b0d">
   <meta name="description" content="CineGraph: explora MovieLens 32M y recibe recomendaciones personales reales de GraphSAGE A9.">
   <title>CineGraph · Tu universo de cine</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static',filename='img/cinegraph-mark.svg') }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -16,7 +17,7 @@
   <a class="skip-link" href="#catalogo">Ir a las películas</a>
   <header class="topbar" id="topbar">
     <div class="topbar-inner">
-      <a href="#inicio" class="brand" aria-label="CineGraph, inicio"><span class="brand-emblem">C<span>G</span></span><span>CINE<span class="brand-red">GRAPH</span></span></a>
+      <a href="#inicio" class="brand" aria-label="CineGraph, inicio"><span class="brand-emblem" aria-hidden="true"><img src="{{ url_for('static',filename='img/cinegraph-mark.svg') }}" width="44" height="44" alt=""></span><span>CINE<span class="brand-red">GRAPH</span></span></a>
       <nav class="main-nav" aria-label="Principal"><a href="#inicio">Inicio</a><a href="#paraTi">Para ti</a><a href="#catalogo">Películas</a><a href="#miLista">Mi lista</a></nav>
       <div class="header-search" id="headerSearch">
         <button type="button" class="search-toggle" id="searchToggle" aria-label="Buscar películas" aria-expanded="false" aria-controls="searchPanel" title="Buscar películas">
