@@ -15,7 +15,6 @@ def test_local_setup_exposes_app_on_pythonpath():
 def test_bootstrap_sql_insert_disambiguated():
     bootstrap = (ROOT / "scripts/local_setup/bootstrap.py").read_text(encoding="utf-8")
     # PostgreSQL necesita WHERE para desambiguar ON CONFLICT tras INSERT SELECT.
-    assert "FROM _incoming_movies\\n                WHERE TRUE\\n                ON CONFLICT" not in bootstrap
     assert "FROM _incoming_movies\n                WHERE TRUE\n                ON CONFLICT" in bootstrap
     assert "DELETE FROM user_interactions" not in bootstrap
     assert "DELETE FROM recommendations WHERE model_version='baseline-v0'" in bootstrap
