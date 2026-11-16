@@ -3,7 +3,8 @@
 // CineGraph: películas leídas de PostgreSQL (catálogo verificado MovieLens 32M).
 // Nunca insertamos títulos, pósteres ni rankings de prueba en el cliente.
 const $ = (id) => document.getElementById(id);
-const state = { user: null, csrf: null, catalog: new Map(), ranking: null, busy: false, authEpoch: 0 };
+const state = { user: null, csrf: null, catalog: new Map(), ranking: null, busy: false, authEpoch: 0, watchlistIds: new Set() };
+let watchlistRequestSequence = 0;
 const rails = [
   { id: "new", title: "Cine destacado del catálogo", genre: null },
   { id: "action", title: "Acción y aventura", genre: "Action" },
@@ -47,6 +48,8 @@ function clearAuthenticatedViews() {
   closeMovieSearch({ restoreFocus: false });
   state.catalog.clear();
   state.ranking = null;
+  state.watchlistIds.clear();
+  watchlistRequestSequence++;
   state.busy = false;
   $("catalogShelves").replaceChildren();
   $("catalogStatus").textContent = "Cargando catálogo…";
@@ -62,7 +65,25 @@ function clearAuthenticatedViews() {
   for (const id of ["searchResultsSection", "paraTi", "catalogo", "miLista"]) $(id).hidden = true;
 }
 
+function updateWatchlistButtons() {
+  document.querySelectorAll('.movie-card button[data-action^="watchlist"]').forEach(button => {
+    const card = button.closest(".movie-card");
+    if (!card) return;
+    const saved = state.watchlistIds.has(Number(card.dataset.movieId));
+    const title = card.querySelector(".movie-info h3")?.textContent || "película";
+    const inWatchlist = card.dataset.surface === "watchlist";
+    button.dataset.action = saved ? "watchlist_remove" : "watchlist";
+    button.classList.toggle("is-selected", saved);
+    button.setAttribute("aria-pressed", String(saved));
+    button.setAttribute("aria-label", saved ? `Quitar ${title} de mi lista` : `Añadir ${title} a mi lista`);
+    button.textContent = saved ? (inWatchlist ? "− Quitar" : "✓ En mi lista") : "＋ Mi lista";
+  });
+}
+
 function movieCard(movie, {rank = false, surface = "catalog"} = {}) {
+  const isSaved = state.watchlistIds.has(Number(movie.movie_id));
+  const listAction = isSaved ? "watchlist_remove" : "watchlist";
+  const listLabel = isSaved ? (surface === "watchlist" ? "− Quitar" : "✓ En mi lista") : "＋ Mi lista";
   const img = posterUrl(movie.poster_url);
   const title = safe(movie.title);
   const genre = safe((movie.genres || []).slice(0, 2).join(" · ") || "Película");
@@ -75,7 +96,7 @@ function movieCard(movie, {rank = false, surface = "catalog"} = {}) {
     <div class="movie-info"><h3>${title}</h3><span>${safe(movie.release_year || "")} · ${genre}</span></div>
     <div class="movie-actions">
       <button type="button" class="feedback-button" data-action="like" aria-label="Me gusta ${title}">♥ Me gusta</button>
-      <button type="button" class="feedback-button" data-action="watchlist" aria-label="Añadir ${title} a mi lista">＋ Mi lista</button>
+      <button type="button" class="feedback-button${isSaved ? " is-selected" : ""}" data-action="${listAction}" aria-pressed="${isSaved}" aria-label="${isSaved ? `Quitar ${title} de mi lista` : `Añadir ${title} a mi lista`}">${listLabel}</button>
       <label class="rating-control">Calificar <select data-action="rating" aria-label="Calificar ${title}">
         <option value="">Estrellas</option>${[5,4.5,4,3.5,3,2.5,2,1.5,1,0.5].map(n=>`<option value="${n}">${n} ★</option>`).join("")}
       </select></label>
@@ -146,25 +167,28 @@ async function loadRecommendations() {
 }
 async function loadWatchlist() {
   const requestEpoch = state.authEpoch;
-  $("miLista").hidden = true;
-  $("watchlistRail").hidden = true;
-  $("watchlistEmpty").hidden = false;
-  if (!state.user) { $("watchlistEmpty").textContent = "Inicia sesión para ver tu lista."; return; }
+  const sequence = ++watchlistRequestSequence;
+  if (!state.user) {
+    $("miLista").hidden = true;
+    return;
+  }
   try {
-    const result = await request("/api/interactions?limit=100");
-    if (requestEpoch !== state.authEpoch || !state.user) return;
-    const seen = new Set(); const list = [];
-    for (const row of result.interactions) {
-      if (row.interaction_type !== "watchlist" || seen.has(Number(row.movie_id))) continue;
-      seen.add(Number(row.movie_id));
-      list.push(state.catalog.get(Number(row.movie_id)) || {movie_id:row.movie_id,title:row.title,genres:[],release_year:null,poster_url:null});
-    }
-    if (!list.length) { $("watchlistEmpty").textContent = "Las películas que guardes aparecerán aquí."; return; }
-    $("watchlistRail").innerHTML = list.map(m => movieCard(m,{surface:"watchlist"})).join("");
-    $("watchlistRail").hidden = false; $("watchlistEmpty").hidden = true;
+    const result = await request("/api/watchlist?limit=1000");
+    if (requestEpoch !== state.authEpoch || sequence !== watchlistRequestSequence || !state.user) return;
+    const movies = Array.isArray(result.movies) ? result.movies : [];
+    state.watchlistIds = new Set(movies.map(movie => Number(movie.movie_id)));
+    for (const movie of movies) state.catalog.set(Number(movie.movie_id), movie);
+    $("watchlistRail").innerHTML = movies.map(movie => movieCard(movie, { surface: "watchlist" })).join("");
+    $("watchlistRail").hidden = movies.length === 0;
+    $("watchlistEmpty").hidden = movies.length > 0;
+    $("watchlistEmpty").textContent = "Tu lista está vacía. Añade películas desde el catálogo o tus recomendaciones.";
     $("miLista").hidden = false;
+    updateWatchlistButtons();
   } catch (_error) {
-    if (requestEpoch === state.authEpoch && state.user) $("watchlistEmpty").textContent = "No fue posible consultar tu lista.";
+    if (requestEpoch !== state.authEpoch || sequence !== watchlistRequestSequence || !state.user) return;
+    $("miLista").hidden = false;
+    $("watchlistEmpty").hidden = false;
+    $("watchlistEmpty").textContent = "No fue posible consultar tu lista.";
   }
 }
 async function sendInteraction(card, action, rating, control) {
@@ -181,9 +205,13 @@ async function sendInteraction(card, action, rating, control) {
     const response = await request("/api/interactions", { method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({movie_id:Number(card.dataset.movieId), interaction_type:action, rating, metadata}) });
     if (!response.interaction) throw new Error("La interacción no quedó registrada.");
-    if (control?.tagName === "BUTTON") { control.classList.add("is-selected"); control.setAttribute("aria-pressed", "true"); }
-    toast(action === "watchlist" ? "Guardada en tu lista." : action === "rating" ? "Calificación guardada." : "Tu preferencia quedó guardada.");
-    if (action === "watchlist") await loadWatchlist();
+    if (action === "watchlist" || action === "watchlist_remove") {
+      await loadWatchlist();
+      toast(action === "watchlist" ? "Película añadida a Mi lista." : "Película retirada de Mi lista.");
+    } else {
+      if (control?.tagName === "BUTTON") { control.classList.add("is-selected"); control.setAttribute("aria-pressed", "true"); }
+      toast(action === "rating" ? "Calificación guardada." : "Tu preferencia quedó guardada.");
+    }
   } catch (error) { toast(error.message || "No se pudo guardar la interacción."); }
   finally { state.busy = false; if (control) control.disabled = false; }
 }

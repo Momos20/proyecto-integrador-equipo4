@@ -276,3 +276,14 @@ MVP Flask + PostgreSQL con feedback operacional funcional. El backend produce cl
 ## Datos y reproducibilidad
 
 Este es un proyecto académico. Los archivos originales de MovieLens no se redistribuirán desde este repositorio; se documentarán las instrucciones para obtener los datos y reproducir el pipeline completo.
+
+
+## Mi lista: añadir y retirar películas (estado reversible)
+
+Las películas guardadas pueden retirarse desde «Mi lista», el catálogo, las búsquedas o la fila de recomendaciones. Las tarjetas muestran «✓ En mi lista» o «− Quitar» según el estado real del usuario. La API `GET /api/watchlist` obtiene el último evento `watchlist`/`watchlist_remove` por película desde PostgreSQL (sin recortar a las últimas 100 interacciones). El envío de una retirada crea un evento `watchlist_remove` tanto en PostgreSQL como en el clickstream que puede enviarse por Floci a Kinesis/Firehose/S3. Raw/Curated/Features aceptan este evento y cuentan `n_watchlist_remove`; no modifica GraphSAGE A9 ni el historial de calificaciones.
+
+**Base de datos ya creada**: aplicar una vez la migración idempotente antes de reiniciar la app, sin borrar tablas ni volúmenes:
+
+```bash
+docker compose exec -T db psql -v ON_ERROR_STOP=1 -U recommender -d recommender < database/migrations/005_watchlist_remove.sql
+```

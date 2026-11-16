@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS user_interactions (
                      REFERENCES movies(movie_id)
                      ON UPDATE CASCADE ON DELETE RESTRICT,
     interaction_type VARCHAR(30) NOT NULL
-                     CHECK (interaction_type IN ('like', 'dislike', 'rating', 'watchlist', 'view_details')),
+                     CHECK (interaction_type IN ('like', 'dislike', 'rating', 'watchlist', 'watchlist_remove', 'view_details')),
     rating           NUMERIC(2,1),
     source            VARCHAR(30) NOT NULL DEFAULT 'cinegraph',
     event_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -28,5 +28,9 @@ CREATE INDEX IF NOT EXISTS ix_user_interactions_movie_event
 
 CREATE INDEX IF NOT EXISTS ix_user_interactions_type_event
     ON user_interactions (interaction_type, event_at DESC);
+
+CREATE INDEX IF NOT EXISTS ix_user_interactions_watchlist_latest
+    ON user_interactions (user_id, movie_id, event_at DESC, interaction_id DESC)
+    WHERE interaction_type IN ('watchlist', 'watchlist_remove');
 
 COMMIT;

@@ -5,6 +5,7 @@ from typing import Any
 from sqlalchemy import text
 
 from app.db import get_engine
+from app.services.catalog_service import KNOWN_TMDB_POSTERS
 
 
 INSERT_INTERACTION_SQL = text(
@@ -100,3 +101,45 @@ def get_recent_interactions(user_id: int, limit: int = 20) -> list[dict[str, Any
         ).mappings().all()
 
     return [_serialize(row) for row in rows]
+
+
+# Leer todo el historial relevante del usuario, no solamente sus últimas 100 interacciones.
+# Orden de desempate por interaction_id: add -> remove -> add produce el estado correcto.
+WATCHLIST_SQL = text(
+    """
+    WITH last_action AS (
+        SELECT i.movie_id, i.interaction_type, i.event_at, i.interaction_id,
+               ROW_NUMBER() OVER (
+                   PARTITION BY i.movie_id
+                   ORDER BY i.event_at DESC, i.interaction_id DESC
+               ) AS rn
+        FROM user_interactions i
+        WHERE i.user_id = :user_id
+          AND i.interaction_type IN ('watchlist', 'watchlist_remove')
+    )
+    SELECT m.movie_id, m.title, m.release_year, m.genres, m.poster_url
+    FROM last_action l
+    JOIN movies m ON m.movie_id = l.movie_id
+    WHERE l.rn = 1 AND l.interaction_type = 'watchlist'
+    ORDER BY l.event_at DESC, l.interaction_id DESC
+    LIMIT :limit
+    """
+)
+
+
+def get_watchlist(user_id: int, limit: int = 500) -> list[dict[str, Any]]:
+    """Último estado de cada película guardada, filtrado por la cuenta autenticada."""
+    with get_engine().connect() as connection:
+        rows = connection.execute(
+            WATCHLIST_SQL, {"user_id": user_id, "limit": limit}
+        ).mappings().all()
+    return [
+        {
+            "movie_id": row["movie_id"],
+            "title": row["title"],
+            "release_year": row["release_year"],
+            "genres": list(row["genres"] or []),
+            "poster_url": row["poster_url"] or KNOWN_TMDB_POSTERS.get(int(row["movie_id"])),
+        }
+        for row in rows
+    ]

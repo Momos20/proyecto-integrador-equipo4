@@ -8,7 +8,7 @@ Los eventos de comportamiento se escriben como JSON Lines (`.jsonl`), una línea
 {
   "schema_version": 1,
   "event_id": "uuid",
-  "event_type": "like|dislike|rating|watchlist|view_details",
+  "event_type": "like|dislike|rating|watchlist|watchlist_remove|view_details",
   "event_source": "http",
   "event_at": "2026-10-17T15:36:33.657157+00:00",
   "request_id": "uuid-or-header",
@@ -33,6 +33,8 @@ Los eventos de comportamiento se escriben como JSON Lines (`.jsonl`), una línea
 - `recommendation_id`, `model_version`, `position`: trazabilidad de la recomendación que originó el feedback.
 - `rating`: solo aplica cuando `event_type=rating`.
 - `cutoff_date`: snapshot/ranking que estaba visible cuando ocurrió el feedback.
+- `watchlist`: el usuario añadió una película. `watchlist_remove`: el usuario la retiró. Son eventos distintos y ambos quedan en el historial de PostgreSQL y de Raw/Curated.
+- El estado actual de «Mi lista» se calcula por **la última acción** de cada película (orden `event_at`, `interaction_id`), no por el mero hecho de que exista algún evento anterior. El endpoint `GET /api/watchlist` devuelve únicamente las películas que siguen guardadas. La agregación `n_watchlist_remove` mide retiradas, no calificaciones A9.
 
 ## Reglas Curated propuestas
 

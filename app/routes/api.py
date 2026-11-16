@@ -11,11 +11,11 @@ from app.services.auth_service import (
 )
 from app.services.catalog_service import get_catalog
 from app.services.clickstream_service import emit_interaction_event
-from app.services.interaction_service import create_interaction, get_recent_interactions
+from app.services.interaction_service import create_interaction, get_recent_interactions, get_watchlist
 from app.services.recommendation_service import get_recommendations
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
-ALLOWED_INTERACTIONS = {"like", "dislike", "rating", "watchlist", "view_details"}
+ALLOWED_INTERACTIONS = {"like", "dislike", "rating", "watchlist", "watchlist_remove", "view_details"}
 
 
 def _csrf_error():
@@ -164,6 +164,23 @@ def interactions_create():
     return jsonify(interaction=interaction, stream_event={
         "event_id": stream_event["event_id"], "event_at": stream_event["event_at"], "logged": True,
     } if stream_event else {"logged": False}), 201
+
+
+@api_bp.get("/watchlist")
+@login_required
+def watchlist():
+    """Mi lista activa: el último evento de cada película determina si permanece guardada."""
+    try:
+        limit = int(request.args.get("limit", "500"))
+    except ValueError:
+        return jsonify(error="invalid_limit"), 400
+    if not 1 <= limit <= 1000:
+        return jsonify(error="invalid_limit"), 400
+    try:
+        movies = get_watchlist(g.account["movielens_user_id"], limit=limit)
+    except SQLAlchemyError:
+        return jsonify(error="database_unavailable"), 503
+    return jsonify(user_id=g.account["movielens_user_id"], count=len(movies), movies=movies)
 
 
 @api_bp.get("/interactions")

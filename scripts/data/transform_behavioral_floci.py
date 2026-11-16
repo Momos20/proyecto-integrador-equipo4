@@ -26,7 +26,7 @@ CURATED_PREFIX = "curated/behavioral/cinegraph/"
 FEATURES_PREFIX = "features/behavioral/cinegraph/"
 LATEST_KEY = CURATED_PREFIX + "latest.json"
 LOCAL_ENDPOINT = "http://floci:4566"
-ALLOWED_EVENTS = {"like", "dislike", "rating", "watchlist", "view_details"}
+ALLOWED_EVENTS = {"like", "dislike", "rating", "watchlist", "watchlist_remove", "view_details"}
 MAX_RAW_OBJECT_BYTES = 64 * 1024 * 1024
 COLUMNS = ("event_id", "schema_version", "event_at", "event_date", "user_id", "movie_id",
            "event_type", "event_source", "rating", "request_id", "recommendation_id",
@@ -202,7 +202,7 @@ def build_snapshot(s3) -> tuple[dict, dict[str, bytes]]:
         key = (e["event_date"], e["user_id"], e["movie_id"])
         if key not in user_movie:
             row = {"event_date": key[0], "user_id": key[1], "movie_id": key[2],
-                   "n_events": 0, "n_like": 0, "n_dislike": 0, "n_watchlist": 0,
+                   "n_events": 0, "n_like": 0, "n_dislike": 0, "n_watchlist": 0, "n_watchlist_remove": 0,
                    "n_view_details": 0, "n_rating": 0, "rating_sum": 0.0,
                    "last_event_at": e["event_at"], "a9_feedback_events": 0}
             user_movie[key] = row
@@ -228,12 +228,12 @@ def build_snapshot(s3) -> tuple[dict, dict[str, bytes]]:
         if key not in user_daily:
             user_daily[key] = {"event_date": key[0], "user_id": key[1],
                                "n_events": 0, "n_movies": 0,
-                               "n_like": 0, "n_dislike": 0, "n_watchlist": 0,
+                               "n_like": 0, "n_dislike": 0, "n_watchlist": 0, "n_watchlist_remove": 0,
                                "n_view_details": 0, "n_rating": 0,
                                "a9_feedback_events": 0, "rating_sum": 0.0}
         day = user_daily[key]
         day["n_movies"] += 1
-        for col in ("n_events", "n_like", "n_dislike", "n_watchlist",
+        for col in ("n_events", "n_like", "n_dislike", "n_watchlist", "n_watchlist_remove",
                     "n_view_details", "n_rating", "a9_feedback_events"):
             day[col] += row[col]
         if row["n_rating"]:
