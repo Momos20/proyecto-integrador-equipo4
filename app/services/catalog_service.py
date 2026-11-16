@@ -1,4 +1,8 @@
-"""Catálogo exclusivamente de MovieLens 32M, importado tras verificar checksum."""
+"""Catálogo exclusivamente de MovieLens 32M, importado tras verificar checksum.
+
+Los parámetros opcionales usan CAST explícito porque psycopg/PostgreSQL no puede
+inferir el tipo de ``:genre IS NULL`` o ``:search IS NULL`` cuando llegan como None.
+"""
 from __future__ import annotations
 
 from sqlalchemy import text
@@ -8,8 +12,8 @@ OFFICIAL_MOVIES_MD5 = "0df90835c19151f9d819d0822e190797"
 CATALOG_SQL = text("""
 SELECT movie_id, title, release_year, genres, poster_url
 FROM movies
-WHERE (:genre IS NULL OR :genre = ANY(genres))
-  AND (:search IS NULL OR title ILIKE ('%' || :search || '%'))
+WHERE (CAST(:genre AS TEXT) IS NULL OR CAST(:genre AS TEXT) = ANY(genres))
+  AND (CAST(:search AS TEXT) IS NULL OR title ILIKE ('%' || CAST(:search AS TEXT) || '%'))
 ORDER BY release_year DESC NULLS LAST, movie_id DESC
 LIMIT :limit OFFSET :offset
 """)

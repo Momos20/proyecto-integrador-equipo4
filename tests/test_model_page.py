@@ -44,3 +44,14 @@ def test_frontend_reveals_only_shelves_with_real_records():
     assert '$("paraTi").hidden = true' in js
     assert '$("miLista").hidden = true' in js
     assert 'window.scrollTo({ top: 0, behavior: "smooth" })' in js
+
+
+def test_optional_catalog_filters_have_explicit_postgres_types():
+    from app.services.catalog_service import CATALOG_SQL
+    sql = str(CATALOG_SQL)
+    # psycopg envía None como tipo desconocido: ':genre IS NULL' falla con 42P18.
+    for field in ("genre", "search"):
+        assert f"CAST(:{field} AS TEXT) IS NULL" in sql
+        assert f":{field} IS NULL" not in sql
+    assert "CAST(:genre AS TEXT) = ANY(genres)" in sql
+    assert "CAST(:search AS TEXT)" in sql
