@@ -2,6 +2,34 @@
 
 **No hemos desplegado CineGraph todavía en AWS.** El entorno local con Docker + Floci se conserva sin cambios. La ruta AWS usa CloudShell, CloudFormation y recursos separados bajo `infrastructure/aws/`.
 
+## Ruta CLI del equipo: EC2 público, RDS privado (alternativa a CloudFront)
+
+Esta ruta sigue **como referencia**, no como receta manual, el laboratorio N0 de SI7002: EC2 para frontend/backend, RDS PostgreSQL como OLTP y VPC/SG. Los siguientes hitos se basan en N1 (S3, streaming, Kinesis/Firehose) y N2 (Curated, Features y Step Functions). **Todos los pasos se harán desde CloudShell con AWS CLI/CloudFormation y validación de resultados**. No se requiere abrir manualmente la consola de servicios; sí iniciar la sesión del Learner Lab y CloudShell.
+
+Situación: `cloudfront:ListDistributions` devolvió `AccessDenied`. Ese permiso de lectura denegado **no demuestra** por sí solo que la creación esté prohibida, pero no basaremos el primer entregable en ese servicio. La ruta de respaldo es una **EC2 accesible públicamente mediante una URL compartible**, con RDS no público. El acceso de usuarios debe protegerse con **HTTPS** antes de activar el inicio de sesión por Internet. Se evaluará un nombre DNS accesible y un certificado TLS válido para un proxy inverso en la EC2; sin dominio/certificado no declarar HTTPS operativo. La guía N0 usa HTTP/Elastic IP únicamente para laboratorio; no es adecuado para contraseñas reales. Usar exclusivamente usuarios ficticios.
+
+Secuencia de implementación sin intervención manual sobre recursos:
+
+0. **Preflight de red, tamaños y permisos de lectura**: `00-check-ec2-rds.sh`. No crea recursos.
+1. **Fundación**: CloudFormation `01-foundation.yaml` con `WEB_INGRESS_MODE=None` por defecto. Crea S3 privado y SG para EC2/RDS, inicialmente sin apertura web.
+2. **Red**: declarar mediante CloudFormation dos subredes privadas en distintas AZ (sin NAT Gateway) que no solapen CIDRs de la VPC actual; una subred pública existente para EC2. Verificar rutas/IGW y permisos.
+3. **Compute y OLTP**: EC2 con `LabInstanceProfile` y un `compose` específico AWS; RDS PostgreSQL privada, DB subnet group, esquema y catálogo importados con herramienta separada del bootstrap local.
+4. **Compartir el frontend**: publicar HTTPS en 443 con un proxy inverso y certificado validado; mantener el puerto interno 8000 inaccesible desde Internet. Compartir enlace solo después de probar salud, login, logout y recomendaciones.
+5. **MLOps**: Kinesis/Firehose hacia S3 Raw, Curated/Features y posteriores servicios que el laboratorio permita.
+
+**Siguiente comando (solo lectura):**
+
+```bash
+cd ~/cinegraph-aws
+git pull --ff-only origin main
+unset AWS_PROFILE
+export AWS_REGION=us-east-1
+export VPC_ID=vpc-083d9bebc31224f94
+bash infrastructure/aws/scripts/00-check-ec2-rds.sh
+```
+
+Validar su salida antes de iniciar cualquier `--apply` o crear recursos. El entorno Docker + Floci local no se modifica.
+
 ## Objetivo: enlace compartible por todo el equipo
 
 CineGraph NO debe quedar ligado a la IP del estudiante: tus compañeros deben entrar desde sus computadores a una URL HTTPS pública, iniciar sesión y consultar el catálogo/GraphSAGE A9.
