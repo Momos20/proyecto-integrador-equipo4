@@ -1,17 +1,37 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >-
-  CineGraph Equipo 4 - Capa base de AWS Academy. Reutiliza la VPC existente;
-  crea solo S3 privado y Security Groups. NO crea EC2, RDS, Glue ni SageMaker.
+  CineGraph Equipo 4 - Base AWS Academy con S3 y security groups.
+  Reutiliza VPC; sin EC2/RDS. El sitio se compartira por HTTPS
+  mediante CloudFront cuando el laboratorio lo permita.
 
 Parameters:
   VpcId:
     Type: AWS::EC2::VPC::Id
-    Description: VPC elegida tras validar la cuenta Learner Lab.
+    Description: VPC existente verificada del Learner Lab.
+  WebIngressMode:
+    Type: String
+    Default: None
+    AllowedValues: [None, RestrictedIP, CloudFront]
+    Description: >-
+      None no abre puerto web; RestrictedIP permite una IP /32 para diagnostico;
+      CloudFront acepta solo el prefijo AWS oficial de origen CloudFront.
   AllowedClientCidr:
     Type: String
-    Description: IP publica de la persona que probara la app /32. Nunca usar 0.0.0.0/0.
+    Default: 127.0.0.1/32
     AllowedPattern: '^(?:[0-9]{1,3}\.){3}[0-9]{1,3}/(?:[0-9]|[12][0-9]|3[0-2])$'
-    ConstraintDescription: Debe ser un CIDR IPv4 valido, preferentemente x.x.x.x/32.
+    Description: >-
+      Solo usado en RestrictedIP. No utilizar 0.0.0.0/0 para un sitio con login.
+  CloudFrontPrefixListId:
+    Type: String
+    Default: ''
+    AllowedPattern: '^$|^pl-[0-9a-f]+$'
+    Description: >-
+      Prefijo administrado com.amazonaws.global.cloudfront.origin-facing.
+      Necesario cuando WebIngressMode=CloudFront.
+
+Conditions:
+  UseRestrictedIP: !Equals [!Ref WebIngressMode, RestrictedIP]
+  UseCloudFront: !Equals [!Ref WebIngressMode, CloudFront]
 
 Resources:
   DataLakeBucket:
@@ -37,24 +57,40 @@ Resources:
   AppSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: CineGraph EC2 - demo app HTTP 8000 only from designated client IP
+      GroupDescription: CineGraph web origin - no public ingress by default
       VpcId: !Ref VpcId
-      SecurityGroupIngress:
-        - Description: Demo web access only from allowed client CIDR
-          IpProtocol: tcp
-          FromPort: 8000
-          ToPort: 8000
-          CidrIp: !Ref AllowedClientCidr
       Tags:
         - Key: Name
           Value: cinegraph-lab-app
         - Key: Project
           Value: CineGraph
 
+  RestrictedWebIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: UseRestrictedIP
+    Properties:
+      GroupId: !Ref AppSecurityGroup
+      Description: Diagnostico HTTP 8000 desde una sola IP controlada
+      IpProtocol: tcp
+      FromPort: 8000
+      ToPort: 8000
+      CidrIp: !Ref AllowedClientCidr
+
+  CloudFrontWebIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: UseCloudFront
+    Properties:
+      GroupId: !Ref AppSecurityGroup
+      Description: HTTP 8000 solo desde CloudFront a origen EC2
+      IpProtocol: tcp
+      FromPort: 8000
+      ToPort: 8000
+      SourcePrefixListId: !Ref CloudFrontPrefixListId
+
   DatabaseSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: CineGraph RDS - PostgreSQL only from CineGraph EC2 security group
+      GroupDescription: CineGraph RDS - PostgreSQL from application EC2 only
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - Description: PostgreSQL from CineGraph app only
@@ -70,13 +106,15 @@ Resources:
 
 Outputs:
   BucketName:
-    Description: Nombre unico del S3 privado (las cargas ocurriran en otra fase).
+    Description: Bucket privado y cifrado para el Data Lake.
     Value: !Ref DataLakeBucket
   AppSecurityGroupId:
-    Description: Grupo de acceso web a EC2 restringido por IP.
+    Description: SG para origen EC2 (no abre SSH).
     Value: !Ref AppSecurityGroup
   DatabaseSecurityGroupId:
-    Description: Grupo de RDS sin acceso publico.
+    Description: SG RDS aislado de Internet.
     Value: !Ref DatabaseSecurityGroup
+  WebIngressMode:
+    Value: !Ref WebIngressMode
   VpcId:
     Value: !Ref VpcId

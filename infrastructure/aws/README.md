@@ -1,95 +1,77 @@
-# CineGraph | despliegue por etapas en AWS Academy Learner Lab
+# CineGraph — infraestructura AWS Academy (separada del entorno local)
 
-**Estado:** archivos preparados, sin despliegue real confirmado. Lo validado hasta ahora funciona en **Docker + Floci local**. Este directorio contiene la ruta real por AWS CLI. No usar credenciales ni datos de Floci en AWS.
+**No hemos desplegado CineGraph todavía en AWS.** El entorno local con Docker + Floci se conserva sin cambios. La ruta AWS usa CloudShell, CloudFormation y recursos separados bajo `infrastructure/aws/`.
 
-## AWS Academy: via principal por CloudShell (validada en la cuenta de laboratorio)
+## Objetivo: enlace compartible por todo el equipo
 
-Se validó en la sesión real de CloudShell que **STS responde**, la región es `us-east-1` y existe la VPC predeterminada `vpc-083d9bebc31224f94` con CIDR `172.31.0.0/16`. Esos resultados solo confirman sesión y lectura de VPC; **no garantizan todavía permisos de creación de S3, SG, EC2 o RDS**.
+CineGraph NO debe quedar ligado a la IP del estudiante: tus compañeros deben entrar desde sus computadores a una URL HTTPS pública, iniciar sesión y consultar el catálogo/GraphSAGE A9.
 
-La configuración de CloudShell usa las **credenciales nativas efímeras**; no crear perfiles de AWS CLI, copiar secretos desde Mac ni exportar access keys. La carpeta `infrastructure/aws/` es independiente de `docker-compose.yml` y `docker-compose.floci.yml`, que permanecerán exclusivamente para pruebas locales.
+Diseño previsto (sujeto a permisos de AWS Academy):
 
-Clonar solo los archivos de AWS para evitar llevar datasets grandes al espacio reducido de CloudShell:
+```text
+Navegadores del equipo
+       | HTTPS (dominio *.cloudfront.net)
+       v
+  Amazon CloudFront  (sin cache de sesiones/API)
+       | HTTP 8000 solo hasta origen EC2 (*)
+       v
+EC2 publica + CineGraph Flask/Gunicorn  --- RDS PostgreSQL privada
+       |                                        ^
+       | clickstream                            |
+       v                                        |
+Kinesis -> Firehose -> S3 privado           Top-K A9
+```
+
+(*) La sesión del navegador viaja cifrada hasta CloudFront, pero la conexión CloudFront→EC2 sería HTTP en este primer laboratorio. **No es seguridad de producción ni HTTPS extremo a extremo**; utilizaremos solo cuentas ficticias de demostración, nada personal/sensible. Una arquitectura final deberá cifrar también el tramo de origen o usar ALB/ACM y HTTPS hacia EC2.
+
+CloudFront proporciona un dominio `https://d....cloudfront.net`, sin necesidad de registrar dominio propio, si la cuenta permite crear distribuciones. En EC2, el puerto 8000 estará abierto **solo al prefijo AWS administrado de IP de origen CloudFront**, no a todo Internet. RDS no recibe conexiones públicas. Si la cuenta no permite CloudFront, diseñaremos otro acceso HTTPS antes de abrir credenciales en la red.
+
+## Etapa actual: diagnósticos (sin recursos creados)
+
+Ya se comprobó que las credenciales de CloudShell funcionan, `us-east-1` es la región, existe la VPC `vpc-083d9bebc31224f94` y tiene seis subredes, está disponible `LabInstanceProfile / LabRole`, RDS permite consulta y CloudFormation valida la plantilla.
+
+En CloudShell:
 
 ```bash
-cd ~
-git clone --depth 1 --filter=blob:none --sparse \
-  https://github.com/Momos20/proyecto-integrador-equipo4.git cinegraph-aws
-cd cinegraph-aws
-git sparse-checkout set infrastructure/aws
+cd ~/cinegraph-aws
+git pull --ff-only origin main
 unset AWS_PROFILE
 export AWS_REGION=us-east-1
-bash infrastructure/aws/scripts/00-preflight.sh
+bash infrastructure/aws/scripts/00-check-sharing.sh
 ```
 
-Si el repositorio requiere autenticación, el comando `git clone` puede fallar; **no publiques tokens de GitHub ni credenciales AWS en la conversación**. Se preparará un acceso seguro a GitHub o una carga de archivos alternativa según el error mostrado.
+Este script comprueba, **sin crear recursos**, si la cuenta permite leer CloudFront y el prefijo de red necesario. No prueba todavía permisos de creación. **Esperar validación antes de continuar.**
 
-La fase 0 es **solo lectura**, y el siguiente archivo `01-foundation.sh` está bloqueado por defecto en `--plan`. No usar `--apply` antes de verificar permisos, subredes y plan.
+## Fundación con CloudFormation — solo después de validar
 
-## Fase 0 — Solo diagnóstico (empezar aquí)
+Archivo: `cloudformation/01-foundation.yaml`. Crea solamente S3 privado/cifrado y dos Security Groups. **Sin EC2, RDS, CloudFront ni Glue en esta fase.** Reutiliza la VPC existente.
 
-1. **En CloudShell** no se copian claves ni se configura un perfil; utiliza el bloque de comandos anterior. Solo si trabajas desde tu Mac se requiere un perfil AWS CLI con credenciales temporales propias de Learner Lab.
-2. Configura la **región habilitada en tu laboratorio**; para el laboratorio actual ya se confirmó `us-east-1`:
+Modos de acceso para el puerto web EC2 (se elige por `WEB_INGRESS_MODE`):
 
-```bash
-unset AWS_PROFILE  # CloudShell usa credenciales de su propia sesion
-export AWS_REGION=us-east-1
-bash infrastructure/aws/scripts/00-preflight.sh
-```
-
-No crea recursos, ni EC2, RDS, S3, IAM o roles. Comprueba STS, VPC, subredes, `LabInstanceProfile`, lectura de RDS y validación CloudFormation. **Una lectura autorizada NO garantiza permisos de creación**. Si hay `ExpiredToken` o `InvalidClientTokenId`, renueva las credenciales del laboratorio. CloudShell no debe configurarse con claves copiadas. Si la cuenta expira, reinicia la sesion del laboratorio. Evita ejecutar `aws configure` sobre tu cuenta personal.
-
-**Antes de continuar:** compartir solo el resultado del preflight, nunca claves, tokens ni contraseñas.
-
-## Fase 1 — Infraestructura mínima (archivos listos, NO ejecutarla todavía)
-
-`cloudformation/01-foundation.yaml` crea únicamente:
-
-- Un **bucket S3 privado**, cifrado con SSE-S3 y con acceso público bloqueado; la eliminación de la pila **retiene** el bucket y sus datos.
-- Security Group de la **aplicación** que permite TCP/8000 **solo desde la IP pública del estudiante (/32)**. Sin SSH abierto; el acceso administrativo se diseñará con `LabInstanceProfile`/SSM si está disponible.
-- Security Group de **PostgreSQL** que acepta TCP/5432 solamente desde el grupo de la aplicación. La futura RDS será **no pública**.
-
-Se reutiliza la VPC existente y no se crean NAT Gateways ni balanceadores. **En esta fase aún NO se crean instancias EC2/RDS**. Las pilas/roles/recursos exactos pueden variar por las restricciones del Learner Lab.
-
-Tras aprobar Fase 0, necesitarás `VPC_ID` y `ALLOWED_CIDR` (IP pública actual del Mac, terminada en `/32`). Para obtener tu IP en un canal de confianza: `curl -4 https://checkip.amazonaws.com` (muestra solo la IP pública; no implica autorización para abrir un puerto a toda Internet). En una red corporativa o VPN podría requerirse actualizarla.
-
-**Plan sin crear nada:**
+- `None` (predeterminado): sin acceso entrante desde redes externas. Seguro mientras se prepara la infraestructura.
+- `CloudFront` (plan de sitio compartido): permite 8000 **solo desde el prefijo administrado `com.amazonaws.global.cloudfront.origin-facing`**. No exige IP individual de tus compañeros.
+- `RestrictedIP` (diagnóstico opcional): permite 8000 desde una única IPv4 pública `/32`; no se usa para el demo del equipo.
 
 ```bash
-export VPC_ID=vpc-REEMPLAZAR
-export ALLOWED_CIDR=203.0.113.10/32  # EJEMPLO, NO usar esta IP ilustrativa
+export VPC_ID=vpc-083d9bebc31224f94
+export WEB_INGRESS_MODE=CloudFront
 bash infrastructure/aws/scripts/01-foundation.sh --plan
 ```
 
-**Creación explícita, solamente cuando validemos el plan y los permisos:**
+`--plan` no crea recursos y valida la plantilla. Si CloudFront no está disponible, no ejecutes ese plan: se decidirá un método HTTPS alternativo. **`--apply` requiere `CONFIRM_LAB_DEPLOY=YES` y solo debe ejecutarse tras comprobar permisos, costos y recursos**.
 
-```bash
-CONFIRM_LAB_DEPLOY=YES bash infrastructure/aws/scripts/01-foundation.sh --apply
-```
+## Secuencia posterior
 
-Revisaremos Outputs del stack antes de diseñar/desplegar la siguiente fase.
+1. Fundación de S3 y SG en CloudFormation.
+2. EC2 con Docker Compose **específico para AWS**, sin `db` local ni Floci.
+3. RDS PostgreSQL no pública, esquema y importación de MovieLens y Top-K históricos verificados; no utilizar sin cambios `local_setup`, que bloquea destinos no locales.
+4. Distribución CloudFront HTTPS configurada **sin cachear sesiones, cookies ni APIs**, con métodos POST para login/interacciones y dominio público para compartir al equipo.
+5. Kinesis Streams → Firehose → S3 Raw, transformación, observabilidad y MLOps según permisos de laboratorio.
 
-## Fases siguientes (se implementarán tras validar cada paso)
+**Seguridad y limpieza:** nunca guardar access keys, contraseñas o cookies en GitHub; no eliminar volúmenes locales; no crear NAT Gateway ni abrir PostgreSQL a Internet; no abrir HTTP 8000 a `0.0.0.0/0` para transportar credenciales; controlar presupuesto y borrar recursos de lab cuando termine la demostración.
 
-| Paso | Qué se migrará | Requisito de seguridad y control |
-|---|---|---|
-| 2 | EC2 con CineGraph y RDS PostgreSQL | Nuevo Compose para AWS **sin `db` local**, secretos protegidos, RDS sin IP pública, esquema y MovieLens 87 585; no ejecutar bootstrap `local_setup` contra RDS sin adaptar su bloqueo local |
-| 3 | Recomendaciones históricas A9 | Publicar solo los 30 resultados verificables del corte 2023-06-15 con manifiesto y hash; **no fingir inferencia sobre AWS** |
-| 4 | Kinesis Data Streams → Firehose → S3 Raw | IAM/roles ya disponibles en Learner Lab, sin abrir el Data Lake; validar con eventos reales desde la aplicación |
-| 5 | Curated/Features y orquestación | Adaptar scripts locales a AWS y evaluar permisos/costos de Glue, Step Functions y SageMaker; no asumir disponibilidad |
-
-### Reglas innegociables
-
-- **No usar `docker-compose.floci.yml` contra AWS**: sus scripts bloquean endpoints no locales por diseño.
-- **No ejecutar `docker compose down -v`**, borrar buckets/RDS o migraciones destructivas.
-- **No usar `--profile default` por accidente** si hay más de una cuenta AWS.
-- No registrar credenciales/contraseñas en Git, logs, pantallas o archivos de la app. Learner Lab usa credenciales temporales y puede restringir servicios, presupuesto, cuotas y regiones.
-- El primer despliegue de la app sería **HTTP en puerto 8000 restringido por IP**, solo para demostración de laboratorio; Internet público requiere HTTPS, control de acceso y una arquitectura adicional.
-- La app actual usa `DATABASE_URL` con hostname `db` de Docker; **no servirá para RDS hasta configurar un Compose separado** en una fase posterior.
-
-### Comprobación de integridad de plantillas
+Comprobación offline de las plantillas:
 
 ```bash
 python3 -m unittest tests/test_aws_academy_scaffold.py -v
 ```
-
-Las pruebas son offline: comprueban que los scripts tengan bloqueo de creación y que la infraestructura no permita DB pública ni tráfico abierto por defecto. **No sustituyen CloudFormation validate-template real.**
