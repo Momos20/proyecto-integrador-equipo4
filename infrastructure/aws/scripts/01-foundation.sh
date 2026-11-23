@@ -2,15 +2,19 @@
 # Fase 1 - S3 privado + SG EC2/RDS. Solo crea con --apply y confirmacion explicita.
 set -euo pipefail
 export AWS_PAGER="" AWS_EC2_METADATA_DISABLED=true AWS_MAX_ATTEMPTS=2 AWS_CLI_AUTO_PROMPT=off
-PROFILE="${AWS_PROFILE:-cinegraph-lab}"
+PROFILE="${AWS_PROFILE:-}"
+AWS=(aws)
+if [[ -n "$PROFILE" ]]; then
+  AWS+=(--profile "$PROFILE")
+fi
 REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-}}"
 if [[ -z "$REGION" ]]; then
-  REGION="$(aws configure get region --profile "$PROFILE" 2>/dev/null || true)"
+  REGION="$("${AWS[@]}" configure get region 2>/dev/null || true)"
 fi
 [[ -n "$REGION" ]] || { echo 'ERROR: falta AWS_REGION' >&2; exit 2; }
 MODE="${1:---plan}"
 if [[ "$MODE" != '--plan' && "$MODE" != '--apply' ]]; then
-  echo 'Uso: AWS_PROFILE=cinegraph-lab AWS_REGION=<region> VPC_ID=vpc-... ALLOWED_CIDR=a.b.c.d/32 bash infrastructure/aws/scripts/01-foundation.sh [--plan|--apply]' >&2
+  echo 'Uso: AWS_REGION=<region> VPC_ID=vpc-... ALLOWED_CIDR=a.b.c.d/32 bash infrastructure/aws/scripts/01-foundation.sh [--plan|--apply] (AWS_PROFILE opcional)' >&2
   exit 2
 fi
 : "${VPC_ID:?Falta VPC_ID; usa el ID verificado en el preflight.}"
@@ -32,10 +36,10 @@ PY_IP
 then
   echo 'ERROR: ALLOWED_CIDR no es una direccion IPv4 publica valida /32.' >&2; exit 2
 fi
-AWS=(aws --profile "$PROFILE" --region "$REGION")
+AWS+=(--region "$REGION")
 TEMPLATE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/cloudformation/01-foundation.yaml"
 STACK="${STACK_NAME:-cinegraph-lab-foundation}"
-echo "Perfil: $PROFILE | Region: $REGION | Stack: $STACK"
+echo "Credenciales: ${PROFILE:-CloudShell nativo} | Region: $REGION | Stack: $STACK"
 "${AWS[@]}" sts get-caller-identity --query Account --output text >/dev/null
 "${AWS[@]}" cloudformation validate-template --template-body "file://$TEMPLATE" --query Description --output text
 echo "VPC: $VPC_ID | Acceso web: $ALLOWED_CIDR (solo puerto 8000)"

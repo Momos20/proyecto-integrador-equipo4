@@ -2,18 +2,41 @@
 
 **Estado:** archivos preparados, sin despliegue real confirmado. Lo validado hasta ahora funciona en **Docker + Floci local**. Este directorio contiene la ruta real por AWS CLI. No usar credenciales ni datos de Floci en AWS.
 
-## Fase 0 — Solo diagnóstico (empezar aquí)
+## AWS Academy: via principal por CloudShell (validada en la cuenta de laboratorio)
 
-1. Inicia la sesión del Learner Lab (**Start Lab**). En **AWS Details > AWS CLI > Show**, copia las credenciales temporales en un **perfil dedicado** `cinegraph-lab` de `~/.aws/credentials` (crea el directorio con `mkdir -p ~/.aws` y protege el archivo con `chmod 600 ~/.aws/credentials`). No pegues las claves en ChatGPT, Git, capturas ni terminal compartida. Si el bloque aparece con `[default]`, renombra **solo el encabezado** del nuevo bloque a `[cinegraph-lab]` sin alterar sus tres campos. Si ya usas `[default]`, ejecuta con `AWS_PROFILE=default`.
-2. Configura la **región habilitada en tu laboratorio**, sin asumir que us-east-1 está disponible:
+Se validó en la sesión real de CloudShell que **STS responde**, la región es `us-east-1` y existe la VPC predeterminada `vpc-083d9bebc31224f94` con CIDR `172.31.0.0/16`. Esos resultados solo confirman sesión y lectura de VPC; **no garantizan todavía permisos de creación de S3, SG, EC2 o RDS**.
+
+La configuración de CloudShell usa las **credenciales nativas efímeras**; no crear perfiles de AWS CLI, copiar secretos desde Mac ni exportar access keys. La carpeta `infrastructure/aws/` es independiente de `docker-compose.yml` y `docker-compose.floci.yml`, que permanecerán exclusivamente para pruebas locales.
+
+Clonar solo los archivos de AWS para evitar llevar datasets grandes al espacio reducido de CloudShell:
 
 ```bash
-export AWS_PROFILE=cinegraph-lab
-export AWS_REGION=us-east-1  # EJEMPLO: sustituye por la región permitida por tu Learner Lab
+cd ~
+git clone --depth 1 --filter=blob:none --sparse \
+  https://github.com/Momos20/proyecto-integrador-equipo4.git cinegraph-aws
+cd cinegraph-aws
+git sparse-checkout set infrastructure/aws
+unset AWS_PROFILE
+export AWS_REGION=us-east-1
 bash infrastructure/aws/scripts/00-preflight.sh
 ```
 
-No crea recursos, ni EC2, RDS, S3, IAM o roles. Comprueba STS, VPC, subredes, `LabInstanceProfile`, lectura de RDS y validación CloudFormation. **Una lectura autorizada NO garantiza permisos de creación**. Si hay `ExpiredToken` o `InvalidClientTokenId`, renueva las credenciales del laboratorio. Evita ejecutar `aws configure` sobre tu cuenta personal.
+Si el repositorio requiere autenticación, el comando `git clone` puede fallar; **no publiques tokens de GitHub ni credenciales AWS en la conversación**. Se preparará un acceso seguro a GitHub o una carga de archivos alternativa según el error mostrado.
+
+La fase 0 es **solo lectura**, y el siguiente archivo `01-foundation.sh` está bloqueado por defecto en `--plan`. No usar `--apply` antes de verificar permisos, subredes y plan.
+
+## Fase 0 — Solo diagnóstico (empezar aquí)
+
+1. **En CloudShell** no se copian claves ni se configura un perfil; utiliza el bloque de comandos anterior. Solo si trabajas desde tu Mac se requiere un perfil AWS CLI con credenciales temporales propias de Learner Lab.
+2. Configura la **región habilitada en tu laboratorio**; para el laboratorio actual ya se confirmó `us-east-1`:
+
+```bash
+unset AWS_PROFILE  # CloudShell usa credenciales de su propia sesion
+export AWS_REGION=us-east-1
+bash infrastructure/aws/scripts/00-preflight.sh
+```
+
+No crea recursos, ni EC2, RDS, S3, IAM o roles. Comprueba STS, VPC, subredes, `LabInstanceProfile`, lectura de RDS y validación CloudFormation. **Una lectura autorizada NO garantiza permisos de creación**. Si hay `ExpiredToken` o `InvalidClientTokenId`, renueva las credenciales del laboratorio. CloudShell no debe configurarse con claves copiadas. Si la cuenta expira, reinicia la sesion del laboratorio. Evita ejecutar `aws configure` sobre tu cuenta personal.
 
 **Antes de continuar:** compartir solo el resultado del preflight, nunca claves, tokens ni contraseñas.
 

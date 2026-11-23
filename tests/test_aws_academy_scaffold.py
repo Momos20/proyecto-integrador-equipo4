@@ -28,6 +28,15 @@ class CloudFoundationTests(unittest.TestCase):
         self.assertIn("sts get-caller-identity", script)
         self.assertIn("cloudformation validate-template", script)
 
+    def test_cloudshell_does_not_force_mac_profile(self):
+        preflight = (AWS / "scripts/00-preflight.sh").read_text(encoding="utf-8")
+        foundation = (AWS / "scripts/01-foundation.sh").read_text(encoding="utf-8")
+        for script in (preflight, foundation):
+            self.assertIn('PROFILE="${AWS_PROFILE:-}"', script)
+            self.assertIn('AWS=(aws)', script)
+            self.assertIn('if [[ -n "$PROFILE" ]]', script)
+            self.assertNotIn('PROFILE="${AWS_PROFILE:-cinegraph-lab}"', script)
+
     def test_deploy_requires_explicit_approval_and_private_cidr(self):
         script = (AWS / "scripts/01-foundation.sh").read_text(encoding="utf-8")
         self.assertIn("CONFIRM_LAB_DEPLOY", script)

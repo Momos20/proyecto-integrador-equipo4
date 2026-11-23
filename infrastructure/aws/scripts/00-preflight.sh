@@ -4,14 +4,20 @@
 set -euo pipefail
 export AWS_PAGER="" AWS_EC2_METADATA_DISABLED=true AWS_MAX_ATTEMPTS=2 AWS_CLI_AUTO_PROMPT=off
 
-PROFILE="${AWS_PROFILE:-cinegraph-lab}"
+PROFILE="${AWS_PROFILE:-}"
+# En CloudShell las credenciales son nativas de la sesion, sin perfil de Mac.
+# Si AWS_PROFILE se define explicitamente, se respeta.
+AWS=(aws)
+if [[ -n "$PROFILE" ]]; then
+  AWS+=(--profile "$PROFILE")
+fi
 if ! command -v aws >/dev/null 2>&1; then
   echo 'ERROR: no esta instalada AWS CLI. En Mac con Homebrew: brew install awscli' >&2
   exit 2
 fi
 REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-}}"
 if [[ -z "$REGION" ]]; then
-  REGION="$(aws configure get region --profile "$PROFILE" 2>/dev/null || true)"
+  REGION="$("${AWS[@]}" configure get region 2>/dev/null || true)"
 fi
 if [[ -z "$REGION" ]]; then
   echo "ERROR: establece AWS_REGION con la region indicada por el laboratorio; ejemplo: export AWS_REGION=us-east-1" >&2
@@ -21,15 +27,15 @@ if [[ ! "$REGION" =~ ^[a-z]{2}-[a-z-]+-[0-9]+$ ]]; then
   echo 'ERROR: codigo de region invalido' >&2
   exit 2
 fi
-awsc() { aws --profile "$PROFILE" --region "$REGION" "$@"; }
+awsc() { "${AWS[@]}" --region "$REGION" "$@"; }
 
 echo '==== CINEGRAPH | AWS ACADEMY - PRECHECK SIN COSTO ===='
 echo "AWS CLI: $(aws --version 2>&1)"
-echo "Perfil: $PROFILE"
+echo "Credenciales: ${PROFILE:-sesion nativa de CloudShell (sin --profile)}"
 echo "Region seleccionada: $REGION"
 echo '[1/6] Validando sesion temporal del Learner Lab...'
 if ! ACCOUNT="$(awsc sts get-caller-identity --query Account --output text 2>/dev/null)"; then
-  echo 'ERROR: token de laboratorio no valido/expirado o perfil incorrecto. Revisa Start Lab > AWS Details > AWS CLI.' >&2
+  echo 'ERROR: sesion de AWS sin credenciales validas. Verifica que CloudShell corresponda al Learner Lab activo.' >&2
   exit 3
 fi
 if [[ ! "$ACCOUNT" =~ ^[0-9]{12}$ ]]; then
