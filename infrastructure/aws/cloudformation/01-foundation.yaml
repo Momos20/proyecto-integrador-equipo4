@@ -1,0 +1,82 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  CineGraph Equipo 4 - Capa base de AWS Academy. Reutiliza la VPC existente;
+  crea solo S3 privado y Security Groups. NO crea EC2, RDS, Glue ni SageMaker.
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC elegida tras validar la cuenta Learner Lab.
+  AllowedClientCidr:
+    Type: String
+    Description: IP publica de la persona que probara la app /32. Nunca usar 0.0.0.0/0.
+    AllowedPattern: '^(?:[0-9]{1,3}\.){3}[0-9]{1,3}/(?:[0-9]|[12][0-9]|3[0-2])$'
+    ConstraintDescription: Debe ser un CIDR IPv4 valido, preferentemente x.x.x.x/32.
+
+Resources:
+  DataLakeBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      Tags:
+        - Key: Project
+          Value: CineGraph
+        - Key: Purpose
+          Value: academic-data-lake
+
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: CineGraph EC2 - demo app HTTP 8000 only from designated client IP
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - Description: Demo web access only from allowed client CIDR
+          IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          CidrIp: !Ref AllowedClientCidr
+      Tags:
+        - Key: Name
+          Value: cinegraph-lab-app
+        - Key: Project
+          Value: CineGraph
+
+  DatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: CineGraph RDS - PostgreSQL only from CineGraph EC2 security group
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - Description: PostgreSQL from CineGraph app only
+          IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref AppSecurityGroup
+      Tags:
+        - Key: Name
+          Value: cinegraph-lab-db
+        - Key: Project
+          Value: CineGraph
+
+Outputs:
+  BucketName:
+    Description: Nombre unico del S3 privado (las cargas ocurriran en otra fase).
+    Value: !Ref DataLakeBucket
+  AppSecurityGroupId:
+    Description: Grupo de acceso web a EC2 restringido por IP.
+    Value: !Ref AppSecurityGroup
+  DatabaseSecurityGroupId:
+    Description: Grupo de RDS sin acceso publico.
+    Value: !Ref DatabaseSecurityGroup
+  VpcId:
+    Value: !Ref VpcId
