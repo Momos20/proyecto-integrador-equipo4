@@ -44,5 +44,18 @@ class AwsWebComposeTests(unittest.TestCase):
             self.assertNotIn(forbidden, txt)
 
 
+    def test_ssm_launch_script_keeps_local_only(self):
+        path = ROOT / "infrastructure/aws/scripts/08-launch-web.sh"
+        script = path.read_text("utf-8")
+        for required in (
+            "SESSION_KEY_PRESENT", "docker compose", "--no-build",
+            "--wait-timeout 120", "http://127.0.0.1:8000",
+            "HTTP_MOVIELENS_CATALOG_OK: 2", "CINEGRAPH_WEB_LOCAL_READY",
+        ):
+            self.assertIn(required, script)
+        for forbidden in ("docker compose -f docker-compose.yml", "SECRET_KEY=", "DB_PASSWORD="):
+            self.assertNotIn(forbidden, script)
+
+
 if __name__ == "__main__":
     unittest.main()

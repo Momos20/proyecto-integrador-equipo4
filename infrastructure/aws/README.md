@@ -1467,7 +1467,7 @@ Se añadieron:
 
 **Importante:** se configura `CINEGRAPH_COOKIE_SECURE=1` y todavía no se habilita acceso público; en el futuro, únicamente un proxy HTTPS válido permitirá login remoto. El SG de app sigue sin inbound público. No ejecutar `docker-compose.yml` de la raíz del repo.
 
-**CloudShell — lanzar SOLO el contenedor web por SSM** (escribe archivo de sesión en EC2 y crea contenedor local; no modifica RDS ni SG):
+**CloudShell — lanzar SOLO el contenedor web por SSM:** se usa el script controlado `infrastructure/aws/scripts/08-launch-web.sh`, que genera la clave local una sola vez, configura el Compose AWS, comprueba salud y API sobre `127.0.0.1`. Si falla, no copia ni registra secretos, y la salida de `docker logs` se revisará **solo si es necesario** tras examinar el error.
 
 ```bash
 cd ~/cinegraph-aws
@@ -1484,48 +1484,11 @@ RDS_ENDPOINT="$(aws cloudformation describe-stacks \
 PARAMS="$(python3 - "$RDS_ENDPOINT" <<'PY'
 import json, shlex, sys
 host=sys.argv[1]
-session_setup="""python3 - <<'INNERCODE'
-import os
-import secrets
-from pathlib import Path
-file = Path('/opt/cinegraph/runtime/session_key')
-if not file.exists():
-    fd = os.open(file, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-    with os.fdopen(fd, 'w', encoding='utf-8') as output:
-        output.write(secrets.token_urlsafe(48))
-elif len(file.read_text(encoding='utf-8').strip()) < 48:
-    raise SystemExit('SESSION_KEY_INVALID')
-file.chmod(0o600)
-print('SESSION_KEY_PRESENT')
-INNERCODE"""
-smoke="""python3 - <<'INNERSMOKE'
-import json
-from urllib.request import urlopen
-base='http://127.0.0.1:8000'
-def request(path):
-    with urlopen(base+path, timeout=8) as response:
-        assert response.status == 200
-        return json.load(response)
-assert request('/health')['status'] == 'ok'
-print('HTTP_HEALTH_OK')
-assert request('/api/ready')['database'] == 'ok'
-print('HTTP_RDS_READY_OK')
-catalog = request('/api/catalog?limit=2')
-assert catalog['ready'] and catalog['count'] == 2
-print('HTTP_MOVIELENS_CATALOG_OK: 2')
-INNERSMOKE"""
 commands=[
     "set -euo pipefail",
-    "cd /opt/cinegraph/source",
-    "git pull --ff-only origin main",
-    "docker image inspect cinegraph-e4-app:main >/dev/null",
-    "install -d -m 0700 /opt/cinegraph/runtime /opt/cinegraph/runtime/clickstream",
-    session_setup,
+    "git -C /opt/cinegraph/source pull --ff-only origin main",
     "export RDS_ENDPOINT=" + shlex.quote(host),
-    "docker compose -p cinegraph-e4 -f infrastructure/aws/compose.web.yaml config --quiet",
-    "docker compose -p cinegraph-e4 -f infrastructure/aws/compose.web.yaml up -d --no-build --wait --wait-timeout 120",
-    "docker compose -p cinegraph-e4 -f infrastructure/aws/compose.web.yaml ps",
-    smoke,
+    "bash /opt/cinegraph/source/infrastructure/aws/scripts/08-launch-web.sh"
 ]
 print(json.dumps({"commands":commands}))
 PY
@@ -1534,7 +1497,7 @@ PY
 COMMAND_ID="$(aws ssm send-command \
   --instance-ids "$WEB_INSTANCE_ID" \
   --document-name AWS-RunShellScript \
-  --comment 'CineGraph - iniciar Flask privado loopback y probar APIs locales' \
+  --comment 'CineGraph: iniciar Flask privado en loopback y probar API' \
   --parameters "$PARAMS" \
   --timeout-seconds 600 \
   --query 'Command.CommandId' --output text)"
@@ -1547,13 +1510,7 @@ aws ssm get-command-invocation \
   --output json
 ```
 
-Se espera `Success` código `0`, `SESSION_KEY_PRESENT`, contenedor `cinegraph-e4-app` `healthy`, `HTTP_HEALTH_OK`, `HTTP_RDS_READY_OK`, `HTTP_MOVIELENS_CATALOG_OK: 2`. Si `wait` falla, consultar igualmente `get-command-invocation` con el mismo ID, y diagnosticar vía SSM **sin imprimir variables de entorno**:
-
-```bash
-aws ssm send-command --instance-ids i-0e3288445cb0df13d \
-  --document-name AWS-RunShellScript \
-  --parameters '{"commands":["docker ps --filter name=cinegraph-e4-app --format \"{{.Names}} {{.Status}} {{.Ports}}\"","docker logs --tail 35 cinegraph-e4-app 2>&1 | sed -E '\''s/password=[^ ]+/password=[REDACTED]/g'\''"]}'
-```
+Se espera `Success`, código `0`, `SESSION_KEY_PRESENT`, contenedor `cinegraph-e4-app` `healthy`, `HTTP_HEALTH_OK`, `HTTP_RDS_READY_OK`, `HTTP_MOVIELENS_CATALOG_OK: 2`, `CINEGRAPH_WEB_LOCAL_READY`. Si `wait` falla, consultar el mismo `COMMAND_ID` mediante `get-command-invocation`, sin reenviar el arranque. Un error que no muestre detalles puede diagnosticarse con una nueva consulta SSM que ejecute `docker ps -a --filter name=cinegraph-e4-app`; evitar `docker inspect` con Environment o imprimir `/proc`, pues el proceso contiene credenciales.
 
 **No abrir inbound 8000/80 ni compartir el login por HTTP.** La aplicación, una vez validada localmente, está lista para conectarse a un reverse proxy con HTTPS real y posteriormente integrar el pipeline Kinesis/S3. Recomendaciones A9 todavía dependen de una publicación verificable de scoring real.
 
