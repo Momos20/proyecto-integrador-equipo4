@@ -36,7 +36,9 @@ Los nombres S3 deben ser globalmente únicos. Si hay colisión, el despliegue fa
 | 12 | Crear PostgreSQL 16.15 privado | **Completo**: CloudFormation `CREATE_COMPLETE`, instancia `available` |
 | 13 | Verificar preparación EC2 | **Completo**: subred pública, rutas IGW, AMI AL2023, LabInstanceProfile y SG sin ingreso; secreto RDS activo |
 | 14 | Verificar AMI, IAM/SSM y plantilla de EC2 | **Completo**: AL2023 disponible, rol con AmazonSSMManagedInstanceCore, YAML válido |
-| 15 | Crear EC2 `cinegraph-e4-web` | **Siguiente**: ejecutar CloudFormation y comprobar instancia/SSM |
+| 15 | Crear EC2 `cinegraph-e4-web` | **Completo**: `CREATE_COMPLETE`; EC2 `running` y SSM `Online` |
+| 16 | Verificar Docker y bootstrap en EC2 | **Siguiente**: comando remoto por SSM, sin abrir SSH |
+
 
 **No quedan recursos de la primera pila**, según el resultado de CloudShell que compartió el equipo. Los scripts temporales de limpieza ya no forman parte del repositorio.
 
@@ -526,6 +528,63 @@ aws ssm describe-instance-information \
 `CREATE_COMPLETE` no garantiza que UserData haya terminado ni que SSM esté en línea. El estado deseado es `running` en EC2, después `Online` en SSM. Si no aparece en SSM, comprobar registro del agente, rutas salientes, permisos de sesión y estado del arranque antes de modificar SG o abrir SSH.
 
 **No usar el Compose local:** contiene PostgreSQL dentro de Docker y contraseñas ficticias. El siguiente paso será implantar la aplicación con un Compose exclusivo para AWS y autenticación segura hacia RDS. La URL pública no tendrá login hasta contar con un certificado HTTPS válido.
+
+## Paso 15 — EC2 creada y registrada en Systems Manager (confirmado)
+
+El despliegue `aws cloudformation deploy --stack-name cinegraph-e4-web` finalizó correctamente, y se verificó la instancia en ejecución. Evidencias reales de CloudShell:
+
+| Componente | Valor |
+|---|---|
+| Estado CloudFormation | `CREATE_COMPLETE` |
+| Stack | `cinegraph-e4-web` |
+| InstanceId | `i-0e3288445cb0df13d` |
+| Estado EC2 | `running` |
+| PrivateIp | `172.31.44.20` |
+| PublicIp | `3.84.177.220` (efímera; puede cambiar al detener/iniciar) |
+| PublicDnsName | `ec2-3-84-177-220.compute-1.amazonaws.com` |
+| AppSecurityGroupId | `sg-0ac188ee36ce97e55` |
+| Systems Manager PingStatus | `Online` |
+| Plataforma SSM | `Amazon Linux` |
+
+**Alcance:** se confirmó la ejecución de la instancia y la conectividad con el agente SSM. Aún no se verificó que el `UserData` haya instalado Docker. Aunque la instancia tiene IP pública, **el SG no permite ningún ingreso HTTP/HTTPS/SSH**. RDS sigue sin acceso público.
+
+## Paso 16 — Verificar Docker de forma remota por Systems Manager
+
+Todos los comandos se envían desde AWS CloudShell a EC2; no necesitan una dirección SSH, clave privada ni acceso público a puertos de administración. Este paso **no modifica el software ni crea nuevos servicios**, solo consulta el resultado del bootstrap remoto. El usuario de CloudShell debe tener `ssm:SendCommand` y `ssm:GetCommandInvocation`; que el agente muestre `Online` no demuestra esos permisos.
+
+```bash
+cd ~/cinegraph-aws
+git pull --ff-only origin main
+unset AWS_PROFILE
+export AWS_REGION=us-east-1
+
+WEB_INSTANCE_ID="$(aws cloudformation describe-stacks \
+  --stack-name cinegraph-e4-web \
+  --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue | [0]" \
+  --output text)"
+echo "Instancia CineGraph: $WEB_INSTANCE_ID"
+
+COMMAND_ID="$(aws ssm send-command \
+  --instance-ids "$WEB_INSTANCE_ID" \
+  --document-name "AWS-RunShellScript" \
+  --comment "CineGraph: verificar Docker y estado cloud-init" \
+  --parameters '{"commands":["systemctl is-active docker","docker --version","cloud-init status","test -d /opt/cinegraph && echo cinegraph_directory_ok"]}' \
+  --query 'Command.CommandId' \
+  --output text)"
+
+echo "SSM CommandId: $COMMAND_ID"
+aws ssm get-command-invocation \
+  --command-id "$COMMAND_ID" \
+  --instance-id "$WEB_INSTANCE_ID" \
+  --query '{Estado:Status,Detalle:StatusDetails,Codigo:ResponseCode,Salida:StandardOutputContent,Error:StandardErrorContent}' \
+  --output json
+```
+
+Si el comando todavía muestra `Pending` o `InProgress`, volver a ejecutar **solo** `get-command-invocation` usando el mismo `COMMAND_ID`. No reenviar comandos en un bucle. Resultado satisfactorio: `Status=Success`, `ResponseCode=0`, Docker activo, versión Docker visible, directorio `/opt/cinegraph` creado y `cloud-init` terminado.
+
+Si aparece `AccessDeniedException` en `ssm send-command`, no abrir SSH como alternativa inmediata: primero revisar los permisos del rol CloudShell/Learner Lab. Si Docker no está activo, inspeccionar `/var/log/cinegraph-bootstrap.log` por SSM y corregir solo después de localizar el error.
+
+**Próxima fase:** aplicación Flask y esquemas de MovieLens en RDS; usar un Compose exclusivo para AWS **sin PostgreSQL local ni Floci**. Ninguna contraseña puede incorporarse al YAML/Compose ni registrarse en Github. Antes de habilitar el inicio de sesión del equipo por Internet, disponer de una URL HTTPS válida.
 
 ## Próximas fases
 
