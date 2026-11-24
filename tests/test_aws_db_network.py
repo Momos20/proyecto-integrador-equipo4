@@ -13,6 +13,7 @@ class PrivateDatabaseNetworkTests(unittest.TestCase):
         self.assertEqual(template.count("Type: AWS::EC2::SubnetRouteTableAssociation"), 2)
         self.assertEqual(template.count("Type: AWS::EC2::RouteTable\n"), 1)
         self.assertEqual(template.count("Type: AWS::RDS::DBSubnetGroup"), 1)
+        self.assertIn("DBSubnetGroupName: cinegraph-e4-rds-subnets", template)
         self.assertEqual(template.count("MapPublicIpOnLaunch: false"), 2)
         self.assertNotIn("AWS::EC2::Route\n", template)
         for forbidden in ("AWS::EC2::Instance", "AWS::RDS::DBInstance",

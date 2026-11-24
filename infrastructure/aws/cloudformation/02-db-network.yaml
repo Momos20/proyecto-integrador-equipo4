@@ -73,6 +73,7 @@ Resources:
   DatabaseSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
     Properties:
+      DBSubnetGroupName: cinegraph-e4-rds-subnets
       DBSubnetGroupDescription: CineGraph RDS private subnets across two AZs
       SubnetIds:
         - !Ref PrivateSubnetA

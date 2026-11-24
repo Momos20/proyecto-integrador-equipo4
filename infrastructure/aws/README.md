@@ -30,7 +30,7 @@ Los nombres S3 deben ser globalmente únicos. Si hay colisión, el despliegue fa
 | 6 | Primera pila `cinegraph-lab-foundation` | Creada, verificada, luego eliminada por cambio de nombres |
 | 7 | Inspección de S3 vacío y SG libres; script temporal de eliminación | **Completado**: pila antigua y bucket vacío eliminados; consulta de stacks activos sin CineGraph |
 | 8 | Crear `cinegraph-e4-foundation` | **Completo**: `CREATE_COMPLETE` (S3 privado + SG app/RDS) |
-| 9 | Preparar red privada `cinegraph-e4-db-network` | **Siguiente**: validar `02-db-network.sh --plan` |
+| 9 | Validar red privada `cinegraph-e4-db-network` | **Plan validado**: dos CIDR libres y dos AZ; **despliegue pendiente** |
 
 **No quedan recursos de la primera pila**, según el resultado de CloudShell que compartió el equipo. Los scripts temporales de limpieza ya no forman parte del repositorio.
 
@@ -102,21 +102,42 @@ aws cloudformation describe-stack-events \
 
 La plantilla establece S3 privado y cifrado con SSE-S3 y dos SG; el acceso web no tiene reglas inbound públicas. **No hay instancia EC2 ni RDS creada todavía.** Confirmar con `get-public-access-block` si se necesitan evidencias adicionales del control S3.
 
-## Paso 9 — Red privada de PostgreSQL (siguiente paso)
+## Paso 9 — Red privada de PostgreSQL (plan validado; creación pendiente)
 
 `cloudformation/02-db-network.yaml` crea dos subredes privadas en distintas AZ, tabla de rutas solo local (sin Internet) y DB Subnet Group; **todavía no crea una instancia RDS**.
 
 Según la red observada, se proponen `172.31.96.0/24` en `us-east-1a` y `172.31.97.0/24` en `us-east-1b`. El script verifica solapamiento y AZ disponibles.
 
+**Evidencia real de CloudShell:** el plan comprobó que ambos CIDR están libres, pertenecen a AZ distintas y no existe solapamiento con las subredes actuales. No creó recursos. Se añadió `DBSubnetGroupName: cinegraph-e4-rds-subnets` para evitar un nombre autogenerado; es necesario repetir el plan tras `git pull` y luego ejecutar la creación.
+
 ```bash
 bash infrastructure/aws/scripts/02-db-network.sh --plan
 ```
+
+Después de actualizar el repositorio, repetir el plan para validar la nueva propiedad con nombre explícito.
 
 Únicamente tras revisar el plan:
 
 ```bash
 CONFIRM_LAB_DEPLOY=YES bash infrastructure/aws/scripts/02-db-network.sh --apply
 ```
+
+Verificar que la pila llegó a `CREATE_COMPLETE`, que el grupo RDS se llama `cinegraph-e4-rds-subnets` y que las subredes no asignan IP pública:
+
+```bash
+aws cloudformation describe-stacks \\
+  --stack-name cinegraph-e4-db-network \\
+  --query 'Stacks[0].{Estado:StackStatus,Recursos:Outputs}' \\
+  --output json
+
+aws rds describe-db-subnet-groups \\
+  --db-subnet-group-name cinegraph-e4-rds-subnets \\
+  --query 'DBSubnetGroups[0].{Nombre:DBSubnetGroupName,Estado:SubnetGroupStatus,Subredes:Subnets[].SubnetIdentifier}' \\
+  --output json
+```
+
+Si CloudFormation falla o revierte el despliegue, consultar `aws cloudformation describe-stack-events --stack-name cinegraph-e4-db-network --output table` antes de cambiar recursos. Aún no existe una instancia de base de datos.
+
 
 ## Próximas fases
 
