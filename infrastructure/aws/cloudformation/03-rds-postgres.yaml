@@ -21,7 +21,7 @@ Resources:
       EngineVersion: '16.15'
       DBInstanceClass: db.t3.micro
       DBName: cinegraph
-      MasterUsername: cinegraph_admin
+      MasterUsername: cinegraphadmin
       ManageMasterUserPassword: true
       DBSubnetGroupName: !Ref DatabaseSubnetGroupName
       VPCSecurityGroups:
@@ -33,6 +33,7 @@ Resources:
       StorageEncrypted: true
       Port: '5432'
       AutoMinorVersionUpgrade: false
+      EngineLifecycleSupport: open-source-rds-extended-support-disabled
       BackupRetentionPeriod: 0
       DeletionProtection: false
       CopyTagsToSnapshot: true

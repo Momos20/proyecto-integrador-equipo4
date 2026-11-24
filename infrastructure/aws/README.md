@@ -234,11 +234,11 @@ Salida real de AWS Academy: versiones `16.9`, `16.10`, `16.11`, `16.12`, `16.13`
 
 ## Paso 12 — Instancia PostgreSQL RDS (por comandos)
 
-Plantilla `cloudformation/03-rds-postgres.yaml`: una instancia `cinegraph-e4-postgres`, PostgreSQL 16.15, `db.t3.micro`, 20 GiB gp3 cifrados, Single-AZ, `PubliclyAccessible=false`, `cinegraph-e4-rds-subnets` y Security Group de RDS. La base inicial es `cinegraph`. El usuario maestro es `cinegraph_admin`, **no es usuario de aplicación**.
+Plantilla `cloudformation/03-rds-postgres.yaml`: una instancia `cinegraph-e4-postgres`, PostgreSQL 16.15, `db.t3.micro`, 20 GiB gp3 cifrados, Single-AZ, `PubliclyAccessible=false`, `cinegraph-e4-rds-subnets` y Security Group de RDS. La base inicial es `cinegraph`. El usuario maestro es `cinegraphadmin`, **no es usuario de aplicación**.
 
 Se usa `ManageMasterUserPassword: true`: RDS crea y administra la contraseña maestra con AWS Secrets Manager. **Nunca introducir una contraseña en la línea de comandos ni compartir secretos.** Secrets Manager tiene costo adicional y puede estar restringido por permisos de AWS Academy; CloudFormation `validate-template` no garantiza permisos para crear recursos. Si aparece `AccessDenied`, consultar eventos y detenerse sin sustituir el secreto por una contraseña fija.
 
-`BackupRetentionPeriod: 0` deshabilita backups automáticos solo para esta demostración, no para producción. `DeletionPolicy: Snapshot` protege los datos al retirar la pila, pero las instantáneas retenidas pueden generar cargos. RDS y Secrets Manager empiezan a consumir presupuesto cuando se crean.
+`BackupRetentionPeriod: 0` deshabilita backups automáticos solo para esta demostración, no para producción. `DeletionPolicy: Snapshot` protege los datos al retirar la pila, pero las instantáneas retenidas pueden generar cargos. RDS y Secrets Manager empiezan a consumir presupuesto cuando se crean. Se deshabilita la inscripción automática en RDS Extended Support para evitar cargos adicionales al finalizar el soporte estándar de PostgreSQL 16.
 
 **Comandos en CloudShell.** Solo se reemplazan región y cuenta al replicar el laboratorio. El SG se recupera de la pila, sin copiar IDs entre cuentas.
 
