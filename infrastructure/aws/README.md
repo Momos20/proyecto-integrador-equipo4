@@ -1749,3 +1749,9 @@ Configurar Step Functions, EventBridge y CloudWatch según roles disponibles. Ac
 - EventBridge cinegraph-e4-behavioral-daily: destino BehavioralETL configurado; cron 07:00 UTC, regla deshabilitada para conservar presupuesto. No se ha validado disparo programado.
 - CloudWatch: cinegraph-e4-firehose-delivery-failure OK; cinegraph-e4-etl-execution-failed INSUFFICIENT_DATA al consultar. Alarmas configuradas, notificación de fallos no verificada.
 - BEHAVIORAL_ORCHESTRATION_VERIFIED. El workflow actual solo ejecuta ETL behavioral; no incluye GraphSAGE ni publicación de recomendaciones.
+
+## Paso 38.5 — Alternativa EC2 por restricciones AWS Academy
+
+La arquitectura inicialmente propuesta contempla Amazon SageMaker para la inferencia batch GraphSAGE A9. Debido al explicit deny de CreateProcessingJob en AWS Academy, se adopta EC2 como alternativa autorizada de cómputo, conservando el checkpoint, el protocolo histórico, S3 y la publicación posterior en RDS. Dry-run t3.large autorizado; t3.xlarge, t2.xlarge, t2.2xlarge, m5.xlarge y m5.2xlarge restringidos. La instancia independiente t3.large dispone de 8 GiB RAM y 2 vCPU; swap de 12 GiB como respaldo, sin modificar la instancia web. La ejecución y publicación siguen pendientes de evidencia. No se modifica IAM.
+
+Ejecutar `bash infrastructure/aws/scripts/17-a9-ec2.sh` desde CloudShell. Detener worker al terminar o fallar para controlar costos.
