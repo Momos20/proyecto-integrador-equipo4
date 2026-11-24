@@ -48,7 +48,8 @@ Los nombres S3 deben ser globalmente únicos. Si hay colisión, el despliegue fa
 | 24 | Verificar lectura post-importación | **Completo**: SCHEMA_MOVIES_EXISTS=True, 87585 filas y registro válido |
 | 25 | Auditar preparación de usuario SQL y cuentas demo | **Completo**: ningún secreto ni cuenta existente, esquema verificado |
 | 26 | Crear identidad SQL y cuentas demo segregadas | **Completo**: dos secretos creados, rol cinegraph_app, tres cuentas, login TLS validado |
-| 27 | Probar lectura del secreto y catálogo desde contenedor aislado | **Siguiente**: smoke test con rol SQL app, sin master, sin red pública |
+| 27 | Probar lectura del secreto y catálogo desde contenedor aislado | **Completo**: APP_DB_SMOKE_SUCCESS, IAM, TLS, 87585 películas, 3 cuentas |
+| 28 | Iniciar Flask/Gunicorn en EC2 solo loopback | **Siguiente**: Compose exclusivo de AWS; API local, sin HTTPS público |
 
 
 
@@ -1436,6 +1437,125 @@ aws ssm get-command-invocation \
 **Resultado esperado:** `Success`, código `0`, `APP_SECRET_ACCESS_OK`, `APP_DATABASE_ROLE_OK`, `APP_DATABASE_TLS_OK`, `APP_CATALOG_OK: 87585`, `APP_DEMO_ACCOUNTS_OK: 3`, `APP_PERMISSIONS_OK` y `APP_DB_SMOKE_SUCCESS: sin escrituras`.
 
 Si `wait` falla, consultar de todas formas `get-command-invocation` con el mismo `COMMAND_ID` para identificar `stage`, sin iniciar un nuevo comando. En particular, errores IMDS/Boto3 dentro de Docker requieren analizar la red de contenedor. El servicio web seguirá sin publicarse hasta instalar un proxy HTTPS válido.
+
+## Paso 27 — Prueba de Docker -> Secrets Manager -> RDS validada
+
+La ejecución remota por SSM fue `Status=Success`, `ResponseCode=0`; se confirmó la ruta de credenciales IAM desde Docker bridge y la conexión SQL del usuario `cinegraph_app`, sin utilizar la clave administradora:
+
+```text
+APP_SECRET_ACCESS_OK
+APP_DATABASE_ROLE_OK
+APP_DATABASE_TLS_OK
+APP_CATALOG_OK: 87585
+APP_DEMO_ACCOUNTS_OK: 3
+APP_PERMISSIONS_OK: INSERT interactions, no UPDATE movies
+APP_DB_SMOKE_SUCCESS: sin escrituras
+```
+
+Los mensajes `From https://github.com/...` en stderr son notificaciones de `git pull`, no fallos.
+
+## Paso 28 — Iniciar el frontend/backend Flask solo en EC2 (siguiente)
+
+Se añadieron:
+- `infrastructure/aws/compose.web.yaml`, definición exclusiva para EC2 del contenedor Flask/Gunicorn, **sin** servicios PostgreSQL ni Floci y con publicación de puerto **solo** en `127.0.0.1:8000`.
+- `infrastructure/aws/scripts/07-start-web.py`, arranque que recupera la contraseña **no administradora** `cinegraph_app` directamente de Secrets Manager usando IAM de la instancia, establece TLS `verify-full` mediante `PGSSLMODE`/`PGSSLROOTCERT`, carga la clave de sesión segura y ejecuta Gunicorn. Ningún secreto aparece en el Compose, en parámetros SSM, en GitHub o en `docker inspect` (solo variables no confidenciales del Compose).
+- `tests/test_aws_web_compose.py`, verificaciones estáticas de seguridad.
+
+**Clave Flask de sesión:** se genera una sola vez localmente en EC2 en `/opt/cinegraph/runtime/session_key` (modo `0600`, directorio `0700`), fuera del repositorio, por `secrets.token_urlsafe(48)`. El Compose monta el archivo de solo lectura dentro del contenedor, para que las sesiones sigan funcionando tras reinicios. No se imprime la clave. Como está en el volumen raíz cifrado de EC2, la pérdida definitiva de esa EC2 invalida las sesiones existentes: habrá que regenerarla en otra instancia. El contenedor consume secretos dentro del proceso; su entorno final incluye DB_PASSWORD, pero no queda en la configuración Compose ni el comando de SSM. Los administradores del host/contenedor pueden acceder a la memoria del proceso; no se permite acceso SSH público.
+
+**Clickstream:** el archivo `/var/log/cinegraph/clickstream.log` del contenedor se persiste en `/opt/cinegraph/runtime/clickstream/` sobre el disco EBS de EC2, para la futura ingesta en Kinesis; no se envía aún a Kinesis.
+
+**Importante:** se configura `CINEGRAPH_COOKIE_SECURE=1` y todavía no se habilita acceso público; en el futuro, únicamente un proxy HTTPS válido permitirá login remoto. El SG de app sigue sin inbound público. No ejecutar `docker-compose.yml` de la raíz del repo.
+
+**CloudShell — lanzar SOLO el contenedor web por SSM** (escribe archivo de sesión en EC2 y crea contenedor local; no modifica RDS ni SG):
+
+```bash
+cd ~/cinegraph-aws
+git pull --ff-only origin main
+unset AWS_PROFILE
+export AWS_REGION=us-east-1
+WEB_INSTANCE_ID=i-0e3288445cb0df13d
+
+RDS_ENDPOINT="$(aws cloudformation describe-stacks \
+  --stack-name cinegraph-e4-postgres \
+  --query "Stacks[0].Outputs[?OutputKey=='DatabaseEndpoint'].OutputValue | [0]" \
+  --output text)"
+
+PARAMS="$(python3 - "$RDS_ENDPOINT" <<'PY'
+import json, shlex, sys
+host=sys.argv[1]
+session_setup="""python3 - <<'INNERCODE'
+import os
+import secrets
+from pathlib import Path
+file = Path('/opt/cinegraph/runtime/session_key')
+if not file.exists():
+    fd = os.open(file, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    with os.fdopen(fd, 'w', encoding='utf-8') as output:
+        output.write(secrets.token_urlsafe(48))
+elif len(file.read_text(encoding='utf-8').strip()) < 48:
+    raise SystemExit('SESSION_KEY_INVALID')
+file.chmod(0o600)
+print('SESSION_KEY_PRESENT')
+INNERCODE"""
+smoke="""python3 - <<'INNERSMOKE'
+import json
+from urllib.request import urlopen
+base='http://127.0.0.1:8000'
+def request(path):
+    with urlopen(base+path, timeout=8) as response:
+        assert response.status == 200
+        return json.load(response)
+assert request('/health')['status'] == 'ok'
+print('HTTP_HEALTH_OK')
+assert request('/api/ready')['database'] == 'ok'
+print('HTTP_RDS_READY_OK')
+catalog = request('/api/catalog?limit=2')
+assert catalog['ready'] and catalog['count'] == 2
+print('HTTP_MOVIELENS_CATALOG_OK: 2')
+INNERSMOKE"""
+commands=[
+    "set -euo pipefail",
+    "cd /opt/cinegraph/source",
+    "git pull --ff-only origin main",
+    "docker image inspect cinegraph-e4-app:main >/dev/null",
+    "install -d -m 0700 /opt/cinegraph/runtime /opt/cinegraph/runtime/clickstream",
+    session_setup,
+    "export RDS_ENDPOINT=" + shlex.quote(host),
+    "docker compose -p cinegraph-e4 -f infrastructure/aws/compose.web.yaml config --quiet",
+    "docker compose -p cinegraph-e4 -f infrastructure/aws/compose.web.yaml up -d --no-build --wait --wait-timeout 120",
+    "docker compose -p cinegraph-e4 -f infrastructure/aws/compose.web.yaml ps",
+    smoke,
+]
+print(json.dumps({"commands":commands}))
+PY
+)"
+
+COMMAND_ID="$(aws ssm send-command \
+  --instance-ids "$WEB_INSTANCE_ID" \
+  --document-name AWS-RunShellScript \
+  --comment 'CineGraph - iniciar Flask privado loopback y probar APIs locales' \
+  --parameters "$PARAMS" \
+  --timeout-seconds 600 \
+  --query 'Command.CommandId' --output text)"
+
+echo "CommandId: $COMMAND_ID"
+aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$WEB_INSTANCE_ID"
+aws ssm get-command-invocation \
+  --command-id "$COMMAND_ID" --instance-id "$WEB_INSTANCE_ID" \
+  --query '{Estado:Status,Codigo:ResponseCode,Salida:StandardOutputContent,Error:StandardErrorContent}' \
+  --output json
+```
+
+Se espera `Success` código `0`, `SESSION_KEY_PRESENT`, contenedor `cinegraph-e4-app` `healthy`, `HTTP_HEALTH_OK`, `HTTP_RDS_READY_OK`, `HTTP_MOVIELENS_CATALOG_OK: 2`. Si `wait` falla, consultar igualmente `get-command-invocation` con el mismo ID, y diagnosticar vía SSM **sin imprimir variables de entorno**:
+
+```bash
+aws ssm send-command --instance-ids i-0e3288445cb0df13d \
+  --document-name AWS-RunShellScript \
+  --parameters '{"commands":["docker ps --filter name=cinegraph-e4-app --format \"{{.Names}} {{.Status}} {{.Ports}}\"","docker logs --tail 35 cinegraph-e4-app 2>&1 | sed -E '\''s/password=[^ ]+/password=[REDACTED]/g'\''"]}'
+```
+
+**No abrir inbound 8000/80 ni compartir el login por HTTP.** La aplicación, una vez validada localmente, está lista para conectarse a un reverse proxy con HTTPS real y posteriormente integrar el pipeline Kinesis/S3. Recomendaciones A9 todavía dependen de una publicación verificable de scoring real.
 
 ## Próximas fases
 

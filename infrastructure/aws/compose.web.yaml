@@ -1,0 +1,36 @@
+# CineGraph E4 - AWS EC2: solo Flask/Gunicorn, SIN PostgreSQL ni Floci locales.
+# Puerto publicado unicamente en loopback del host. Exponer por HTTPS se hara despues.
+name: cinegraph-e4
+services:
+  web:
+    image: cinegraph-e4-app:main
+    container_name: cinegraph-e4-app
+    restart: unless-stopped
+    command: ["python", "/aws/start-web.py"]
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      AWS_REGION: us-east-1
+      RDS_ENDPOINT: ${RDS_ENDPOINT:?RDS_ENDPOINT requerido en el host EC2}
+      APP_DB_SECRET_ID: cinegraph-e4-app-db
+      CINEGRAPH_ENV: production
+      CINEGRAPH_COOKIE_SECURE: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      CLICKSTREAM_LOG_PATH: /var/log/cinegraph/clickstream.log
+    volumes:
+      - ./scripts/07-start-web.py:/aws/start-web.py:ro
+      - /opt/cinegraph/runtime/session_key:/run/secrets/cinegraph_session_key:ro
+      - /opt/cinegraph/runtime/clickstream:/var/log/cinegraph
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=32m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=3).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
