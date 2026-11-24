@@ -1,0 +1,100 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  CineGraph AWS Academy - dos subredes privadas en distintas AZ,
+  tabla de rutas local sin Internet y DB Subnet Group para RDS.
+  No crea instancias RDS ni EC2, NAT Gateway o recursos publicos.
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC existente de CineGraph.
+  AvailabilityZoneA:
+    Type: AWS::EC2::AvailabilityZone::Name
+    Description: Primera zona disponible en la region.
+  AvailabilityZoneB:
+    Type: AWS::EC2::AvailabilityZone::Name
+    Description: Segunda zona disponible, diferente de la primera.
+  PrivateCidrA:
+    Type: String
+    Description: CIDR privado libre dentro de la VPC.
+  PrivateCidrB:
+    Type: String
+    Description: Segundo CIDR privado libre, sin solaparse con el primero.
+
+Resources:
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VpcId
+      AvailabilityZone: !Ref AvailabilityZoneA
+      CidrBlock: !Ref PrivateCidrA
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: cinegraph-db-private-a
+        - Key: Project
+          Value: CineGraph
+
+  PrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VpcId
+      AvailabilityZone: !Ref AvailabilityZoneB
+      CidrBlock: !Ref PrivateCidrB
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: cinegraph-db-private-b
+        - Key: Project
+          Value: CineGraph
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: cinegraph-db-private-rt
+        - Key: Project
+          Value: CineGraph
+
+  PrivateSubnetARouteAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnetA
+
+  PrivateSubnetBRouteAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnetB
+
+  DatabaseSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: CineGraph RDS private subnets across two AZs
+      SubnetIds:
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetB
+      Tags:
+        - Key: Name
+          Value: cinegraph-db-subnets
+        - Key: Project
+          Value: CineGraph
+
+Outputs:
+  VpcId:
+    Value: !Ref VpcId
+  PrivateSubnetAId:
+    Description: RDS subnet in Availability Zone A.
+    Value: !Ref PrivateSubnetA
+  PrivateSubnetBId:
+    Description: RDS subnet in Availability Zone B.
+    Value: !Ref PrivateSubnetB
+  PrivateRouteTableId:
+    Description: Local-only route table associated with both private subnets.
+    Value: !Ref PrivateRouteTable
+  DBSubnetGroupName:
+    Description: Use this subnet group when creating the private RDS instance.
+    Value: !Ref DatabaseSubnetGroup

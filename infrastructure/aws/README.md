@@ -1,6 +1,26 @@
 # CineGraph — infraestructura AWS Academy (separada del entorno local)
 
-**No hemos desplegado CineGraph todavía en AWS.** El entorno local con Docker + Floci se conserva sin cambios. La ruta AWS usa CloudShell, CloudFormation y recursos separados bajo `infrastructure/aws/`.
+**Estado real:** la pila `cinegraph-lab-foundation` ya se creó correctamente en AWS Academy: bucket S3 privado y Security Groups para EC2 y RDS, con `WebIngressMode=None`. Todavía no se han desplegado EC2, RDS ni el frontend. El entorno local con Docker + Floci se conserva sin cambios. La ruta AWS usa CloudShell, CloudFormation y recursos separados bajo `infrastructure/aws/`.
+
+## Fase 2: red privada de PostgreSQL — plantilla preparada, sin ejecutar
+
+La pila independiente `cloudformation/02-db-network.yaml` reutiliza la VPC de `cinegraph-lab-foundation` y crea **dos subredes privadas en dos AZ**, una tabla de rutas que solo contiene la ruta implícita local de la VPC y un `AWS::RDS::DBSubnetGroup`. No crea una instancia de base de datos ni EC2 y no crea NAT Gateway. El Security Group privado de RDS ya existe en la pila foundation; se reutilizará cuando despleguemos PostgreSQL.
+
+De acuerdo con el diagnóstico real de la VPC, las seis subredes actuales ocupan `172.31.0.0/20` hasta `172.31.80.0/20`. Los candidatos `172.31.96.0/24` (us-east-1a) y `172.31.97.0/24` (us-east-1b) están libres **según esa consulta**. El script comprueba nuevamente la VPC, las zonas disponibles y los solapamientos antes de permitir crear nada.
+
+Solo validar el plan desde CloudShell:
+
+```bash
+cd ~/cinegraph-aws
+git pull --ff-only origin main
+unset AWS_PROFILE
+export AWS_REGION=us-east-1
+bash infrastructure/aws/scripts/02-db-network.sh --plan
+```
+
+El resultado esperado es `PLAN OK: 2 subredes privadas + tabla de rutas + DB Subnet Group.` **No ejecutar todavía `--apply` sin revisar la salida y aprobarla.** Si el laboratorio rechaza crear `AWS::RDS::DBSubnetGroup` por IAM, la pila puede quedar en `ROLLBACK_COMPLETE`; revisar eventos antes de reintentar.
+
+Tras aprobar y crear la pila, antes de lanzar RDS se comprobarán sus Output IDs, que las dos subredes estén en AZ distintas, `MapPublicIpOnLaunch=false`, ausencia de rutas externas y el grupo de seguridad de RDS restringido a la aplicación.
 
 ## Ruta CLI del equipo: EC2 público, RDS privado (alternativa a CloudFront)
 
