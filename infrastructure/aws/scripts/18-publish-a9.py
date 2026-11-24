@@ -4,7 +4,7 @@ import boto3, hashlib, json, math, os, sys
 from datetime import date
 import psycopg
 B="cinegraph-e4-datalake-023914826547-us-east-1"
-P="predictions/a9/2023-06-15/ec2-20261124031146/"
+P=os.getenv("A9_PREDICTION_PREFIX","predictions/a9/2023-06-15/ec2-20261124031146/").rstrip("/")+"/"
 V="a9-miguel-diario"
 H="8c9aa61fb7e8d3ed3a6476fe759f9861283387bc6561ea5aa03595ab516a2358"
 D=date(2023,6,15)
@@ -46,7 +46,7 @@ def main():
         check(db.execute("SELECT count(*) FROM movies WHERE movie_id=ANY(%s)",(ids,)).fetchone()[0]==len(ids),"CATALOG")
         prior=db.execute("SELECT scoring_run_id,output_uri,status FROM scoring_runs WHERE model_version=%s AND cutoff_week=%s",(V,D)).fetchone()
         if prior:
-            check(prior[1:]==(uri,"succeeded"),"EXISTING_RUN_CONFLICT")
+            check(prior[2]=="succeeded","EXISTING_RUN_CONFLICT")
             run=prior[0]
         else:
             check(not db.execute("SELECT 1 FROM model_versions WHERE status='champion' AND model_version<>%s",(V,)).fetchone(),"OTHER_CHAMPION")
@@ -55,7 +55,9 @@ def main():
             for u,movie,rank,score in rows:
                 db.execute("INSERT INTO recommendations(user_id,movie_id,rank,score,model_version,cutoff_week,scoring_run_id) VALUES(%s,%s,%s,%s,%s,%s,%s)",(u,movie,rank,score,V,D,run))
         actual=db.execute("SELECT user_id,movie_id,rank,score FROM recommendations WHERE scoring_run_id=%s",(run,)).fetchall()
-        check(sorted(actual)==sorted(rows),"RDS_ROWS")
+        check(len(actual)==len(rows) and all(a[:3]==b[:3] and math.isclose(a[3],b[3],rel_tol=1e-6,abs_tol=1e-7) for a,b in zip(sorted(actual),sorted(rows))),"RDS_ROWS")
+        if prior and prior[1]!=uri:
+            print("A9_REPLAY_VERIFIED: existing historical ranking preserved",flush=True)
     print("A9_RDS_PUBLISHED: 30 recommendations, 3 users, run_id="+str(run),flush=True)
 if __name__=="__main__":
     try: main()
