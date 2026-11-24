@@ -672,6 +672,8 @@ SSM `AWS-RunShellScript` sobre `i-0e3288445cb0df13d` devolvió `Success`. El end
 
 ## Paso 18 — Instalar Git y Docker Compose en la EC2 (siguiente)
 
+**Primera ejecución fallida (evidencia real):** el comando `dnf install -y -q git curl` se detuvo antes de instalar Git o Compose con código `1`, porque Amazon Linux 2023 tiene `curl-minimal` ya instalado y el paquete completo `curl` es incompatible. `CommandId=e4da3a3f-689b-4592-bb9b-218365da963c`. La corrección es instalar **solo Git** y usar el `curl` existente. No desinstalar `curl-minimal` ni usar `--allowerasing`.
+
 Docker Engine `25.0.14` está activo. Amazon Linux 2023 puede instalar `git` con `dnf`; Docker Compose se instalará **como plugin oficial**, no sustituyendo Docker Engine ni agregando repositorios RPM de otras distribuciones. Binario oficial `docker/compose` `v5.6.0` (`x86_64`), con checksum SHA-256 tomado del digest publicado en el asset oficial de GitHub Releases. La instalación manual requiere gestionar futuras actualizaciones del plugin.
 
 Ejecutar en **CloudShell**; el comando se envía a EC2 a través de SSM y solo instala las herramientas que faltan:
@@ -687,7 +689,9 @@ PARAMS="$(python3 - <<'PY'
 import json
 cmds = [
     "set -euo pipefail",
-    "dnf install -y -q git curl",
+    "dnf install -y -q git",
+    "command -v curl",
+    "curl --version | head -1",
     "mkdir -p /usr/local/lib/docker/cli-plugins",
     "curl --fail --silent --show-error --location --retry 3 https://github.com/docker/compose/releases/download/v5.6.0/docker-compose-linux-x86_64 --output /tmp/cinegraph-compose-v5.6.0",
     "printf '%s  %s\\n' 40343e21ca777173e69cff5dbafeb37c6f81f3b0d57d9e597f036e95eb63e76a /tmp/cinegraph-compose-v5.6.0 | sha256sum --check",
@@ -695,7 +699,7 @@ cmds = [
     "rm -f /tmp/cinegraph-compose-v5.6.0",
     "git --version",
     "docker compose version",
-    "docker buildx version",
+    "docker buildx version || echo BUILDX_MISSING",
     "systemctl is-active docker",
 ]
 print(json.dumps({"commands": cmds}))
@@ -720,7 +724,7 @@ aws ssm get-command-invocation \
 
 Esperamos `Success`, código `0`, Git instalado, Compose en `docker compose version`, Docker activo. Si falla `sha256sum`, **no se instala el binario**; inspeccionar el error de descarga antes de reintentar. Si el `wait` termina en error, ejecutar `get-command-invocation` de todas formas con el mismo ID para obtener el detalle.
 
-`docker buildx version` se consulta como control adicional: el paquete Docker de AL2023 puede traer Buildx antiguo, y algunas versiones modernas de Compose exigen Buildx más reciente para construir imágenes. **No modificar Buildx ni arrancar la app hasta revisar esa salida.**
+`docker buildx version` se consulta como control adicional y, si falta, se muestra `BUILDX_MISSING` sin marcar fallida la instalación de Compose: el paquete Docker de AL2023 puede traer Buildx antiguo, y algunas versiones modernas de Compose exigen Buildx más reciente para construir imágenes. **No modificar Buildx ni arrancar la app hasta revisar esa salida.**
 
 ## Próximas fases
 
