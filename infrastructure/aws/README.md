@@ -1733,3 +1733,11 @@ Verificar disponibilidad del Parquet MovieLens 32M, checkpoint original, depende
 ## Paso 39 — Orquestación y observabilidad (pendiente)
 
 Configurar Step Functions, EventBridge y CloudWatch según roles disponibles. Activar programación únicamente después de validar una ejecución manual completa; conservar evidencias de estados, errores y métricas. No confundir recursos creados con pipeline funcional.
+
+## Evidencias pasos 36–38 (24 noviembre 2026 UTC)
+
+- Kinesis cinegraph-e4-clickstream ACTIVE; Firehose cinegraph-e4-firehose ACTIVE; Glue database cinegraph_e4 creada.
+- SSM dd9498a3-0de6-4fe8-9481-e87fc6935ccf Success: Kinesis Agent activo; Firehose entregó objeto GZIP de 500 bytes a raw/behavioral/.
+- Glue job cinegraph-e4-behavioral-etl, run jr_30cd3798b8dfa90bf758758b9074374757b1ce49a3ef9f67de10bb609a5da04c SUCCEEDED. Snapshot 3249895e35672b0848231d08: 5 líneas, 5 válidas, 0 duplicados, 0 inválidas, 1 fila user_daily y 1 fila user_movie_daily. Salidas y SHA-256 verificados.
+- A9 checkpoint SHA-256 8c9aa61fb7e8d3ed3a6476fe759f9861283387bc6561ea5aa03595ab516a2358 verificado; modelo, configuración y bundle cargados a models/a9/ en S3.
+- SageMaker CreateProcessingJob rechazado por explicit deny de Pvoclabs2. No hubo inferencia ni job creado. No modificar IAM ni intentar eludir la política. Evaluar EC2 independiente como servicio de cómputo alternativo autorizado por el laboratorio; si el laboratorio no permite este cómputo, escalar al docente.
