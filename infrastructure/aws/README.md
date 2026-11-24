@@ -41,7 +41,8 @@ Los nombres S3 deben ser globalmente únicos. Si hay colisión, el despliegue fa
 | 17 | Comprobar requisitos de app y acceso EC2 → RDS | **Completo**: DNS y TCP 5432 correctos, faltan Git y Compose |
 | 18 | Instalar Git y Docker Compose verificado | **Completo**: Git 2.50.1, Compose v5.6.0, SHA-256 correcto; Docker activo |
 | 19 | Actualizar Docker Buildx para Compose | **Completo**: Buildx v0.29.1, plugin verificado, BuildKit operativo |
-| 20 | Clonar fuente y construir imagen Flask en EC2 | **Siguiente**: solo imagen local; no iniciar app, migrar RDS ni abrir puertos |
+| 20 | Clonar fuente y construir imagen Flask en EC2 | **Completo**: SHA de Git, BUILD_IMAGE_OK, FLASK_IMPORT_OK, código SSM 0 |
+| 21 | Verificar lectura segura del secreto y catálogo MovieLens | **Siguiente**: acceso IAM desde EC2 y checksum MD5, sin imprimir secretos |
 
 
 
@@ -846,6 +847,72 @@ aws ssm get-command-invocation \
 Se espera `Success`, código `0`, `BUILD_IMAGE_OK`, metadatos de la imagen y `FLASK_IMPORT_OK`. El smoke test usa `--network none` y un contenedor efímero; **no se conecta a PostgreSQL** ni levanta un puerto. La salida normal de la construcción queda en `/var/log/cinegraph-build.log` dentro de EC2. Si algo falla, se imprime únicamente la cola de ese log para diagnóstico; no reintentar antes de revisar el error. Si falla `wait`, consultar `get-command-invocation` con el mismo ID.
 
 Posteriormente se preparará el esquema de RDS y un usuario de aplicación de mínimo privilegio, con gestión de credenciales fuera del repositorio. El Compose AWS se diseñará sin contenedor `db` y con Flask escuchando en loopback hasta contar con un proxy HTTPS verificable. No habilitar login público por HTTP.
+
+## Paso 20 — Imagen Flask construida (confirmado)
+
+Ejecución real en EC2 por SSM: `CommandId=a70c3f31-9f6f-4d31-a6ab-866449775db2`, `Status=Success`, código `0`. Se clonó el commit `d70c14d9b2d3` a `/opt/cinegraph/source`. Construcción local de `cinegraph-e4-app:main` completada con `BUILD_IMAGE_OK`, arquitectura `amd64`, tamaño `202114951` bytes y smoke test aislado `FLASK_IMPORT_OK`. El texto `Cloning into...` llega por stderr de Git sin representar un fallo.
+
+Esta verificación **no ha iniciado Gunicorn, aplicado migraciones ni importado películas a RDS**.
+
+## Paso 21 — Comprobar permiso para leer el secreto RDS y origen MovieLens (siguiente)
+
+RDS administra el secreto maestro mediante Secrets Manager. El próximo bootstrap deberá acceder a él **desde EC2**, usando `LabRole` y sin guardar la contraseña en comandos, archivos, bitácoras o GitHub. Para comprobar que `secretsmanager:GetSecretValue` está permitido, usamos una consulta que solicita el objeto al servicio pero **descarta todos los valores devueltos** y solo imprime `SECRET_ACCESS_OK`. No consultar ni imprimir `SecretString`.
+
+Antes de aplicar SQL, también se comprobará que el catálogo de MovieLens clonado conserva el MD5 del material de referencia original `0df90835c19151f9d819d0822e190797`. Estas pruebas no modifican RDS ni despliegan la web.
+
+**Ejecutar en CloudShell:**
+
+```bash
+cd ~/cinegraph-aws
+git pull --ff-only origin main
+unset AWS_PROFILE
+export AWS_REGION=us-east-1
+
+WEB_INSTANCE_ID="$(aws cloudformation describe-stacks \
+  --stack-name cinegraph-e4-web \
+  --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue | [0]" \
+  --output text)"
+
+SECRET_ARN="$(aws rds describe-db-instances \
+  --db-instance-identifier cinegraph-e4-postgres \
+  --query 'DBInstances[0].MasterUserSecret.SecretArn' \
+  --output text)"
+test -n "$SECRET_ARN" && test "$SECRET_ARN" != "None" || { echo "RDS_SECRET_ARN_MISSING"; exit 1; }
+
+PARAMS="$(python3 - "$SECRET_ARN" <<'PY'
+import json, shlex, sys
+secret_arn = sys.argv[1]
+commands = [
+    "set -euo pipefail",
+    "aws secretsmanager get-secret-value --secret-id " + shlex.quote(secret_arn) + " --query ARN --output text >/dev/null && echo SECRET_ACCESS_OK",
+    "cd /opt/cinegraph/source",
+    "test -f database/schema/001_init.sql && test -f database/schema/002_views.sql && test -f database/schema/003_user_interactions.sql && test -f database/migrations/004_cinegraph_accounts_catalog.sql && test -f database/migrations/005_watchlist_remove.sql && echo SQL_FILES_OK",
+    "cat data/reference/movielens32m/parts/movies.part0{1,2,3}.csv | md5sum | awk '{print $1}' | grep -Fx '0df90835c19151f9d819d0822e190797' >/dev/null && echo MOVIELENS_MD5_OK",
+]
+print(json.dumps({"commands":commands}))
+PY
+)"
+
+COMMAND_ID="$(aws ssm send-command \
+  --instance-ids "$WEB_INSTANCE_ID" \
+  --document-name AWS-RunShellScript \
+  --comment 'CineGraph verificar IAM secreto y checksum catalogo, sin imprimir secretos' \
+  --parameters "$PARAMS" \
+  --query 'Command.CommandId' --output text)"
+
+echo "CommandId: $COMMAND_ID"
+aws ssm wait command-executed \
+  --command-id "$COMMAND_ID" --instance-id "$WEB_INSTANCE_ID"
+
+aws ssm get-command-invocation \
+  --command-id "$COMMAND_ID" --instance-id "$WEB_INSTANCE_ID" \
+  --query '{Estado:Status,Codigo:ResponseCode,Salida:StandardOutputContent,Error:StandardErrorContent}' \
+  --output json
+```
+
+Éxito: `Success`, `Codigo=0`, `SECRET_ACCESS_OK`, `SQL_FILES_OK`, `MOVIELENS_MD5_OK`. Si no tiene permiso para acceder al secreto, **no** sustituir la configuración por una contraseña fija en shell o repositorio; verificar el alcance de las políticas del laboratorio.
+
+Una vez validados estos requisitos, el siguiente paso será implementar el bootstrap RDS de forma transaccional e idempotente usando las tablas del repositorio y los datos originales, separando las cuentas de aplicación del usuario maestro `cinegraphadmin`. No trasladar a AWS cuentas locales ni datos de Floci.
 
 ## Próximas fases
 
