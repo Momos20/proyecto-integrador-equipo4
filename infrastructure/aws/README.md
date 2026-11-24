@@ -30,7 +30,7 @@ Los nombres S3 deben ser globalmente únicos. Si hay colisión, el despliegue fa
 | 6 | Primera pila `cinegraph-lab-foundation` | Creada, verificada, luego eliminada por cambio de nombres |
 | 7 | Inspección de S3 vacío y SG libres; script temporal de eliminación | **Completado**: pila antigua y bucket vacío eliminados; consulta de stacks activos sin CineGraph |
 | 8 | Crear `cinegraph-e4-foundation` | **Completo**: `CREATE_COMPLETE` (S3 privado + SG app/RDS) |
-| 9 | Validar red privada `cinegraph-e4-db-network` | **Plan validado**: dos CIDR libres y dos AZ; **despliegue pendiente** |
+| 9 | Desplegar red privada `cinegraph-e4-db-network` | **Completo**: `CREATE_COMPLETE`; dos subredes privadas y DB Subnet Group |
 
 **No quedan recursos de la primera pila**, según el resultado de CloudShell que compartió el equipo. Los scripts temporales de limpieza ya no forman parte del repositorio.
 
@@ -102,7 +102,7 @@ aws cloudformation describe-stack-events \
 
 La plantilla establece S3 privado y cifrado con SSE-S3 y dos SG; el acceso web no tiene reglas inbound públicas. **No hay instancia EC2 ni RDS creada todavía.** Confirmar con `get-public-access-block` si se necesitan evidencias adicionales del control S3.
 
-## Paso 9 — Red privada de PostgreSQL (plan validado; creación pendiente)
+## Paso 9 — Red privada de PostgreSQL (creada y verificada)
 
 `cloudformation/02-db-network.yaml` crea dos subredes privadas en distintas AZ, tabla de rutas solo local (sin Internet) y DB Subnet Group; **todavía no crea una instancia RDS**.
 
@@ -137,6 +137,57 @@ aws rds describe-db-subnet-groups \\
 ```
 
 Si CloudFormation falla o revierte el despliegue, consultar `aws cloudformation describe-stack-events --stack-name cinegraph-e4-db-network --output table` antes de cambiar recursos. Aún no existe una instancia de base de datos.
+
+**Ejecución real confirmada en CloudShell:** el plan volvió a comprobar CIDR y AZ, `CONFIRM_LAB_DEPLOY=YES bash infrastructure/aws/scripts/02-db-network.sh --apply` creó correctamente la pila `cinegraph-e4-db-network`, y `describe-stacks` mostró `CREATE_COMPLETE`.
+
+| Output de CloudFormation | Valor confirmado |
+|---|---|
+| PrivateSubnetAId | `subnet-0793bb5ed242a6d56` |
+| PrivateSubnetBId | `subnet-0b96249ebfcb8aa5b` |
+| PrivateRouteTableId | `rtb-0b801c15c96837c89` |
+| DBSubnetGroupName | `cinegraph-e4-rds-subnets` |
+| VpcId | `vpc-083d9bebc31224f94` |
+
+## Paso 10 — Verificar seguridad de red y opciones de RDS (solo lectura)
+
+Antes de crear `cinegraph-e4-postgres` y empezar a consumir presupuesto de RDS, confirmar que la tabla de rutas de la base contiene solamente la ruta local, que las subredes no generan IPv4 pública, que RDS admite el grupo y que el puerto 5432 solo acepta desde el SG de aplicación.
+
+```bash
+cd ~/cinegraph-aws
+git pull --ff-only origin main
+unset AWS_PROFILE
+export AWS_REGION=us-east-1
+
+aws ec2 describe-subnets \
+  --subnet-ids subnet-0793bb5ed242a6d56 subnet-0b96249ebfcb8aa5b \
+  --query 'Subnets[].[SubnetId,AvailabilityZone,CidrBlock,MapPublicIpOnLaunch]' \
+  --output table
+
+aws ec2 describe-route-tables \
+  --route-table-ids rtb-0b801c15c96837c89 \
+  --query 'RouteTables[0].Routes[].[DestinationCidrBlock,GatewayId,State]' \
+  --output table
+
+aws ec2 describe-security-groups \
+  --group-ids sg-0199de1701183b327 \
+  --query 'SecurityGroups[0].IpPermissions' \
+  --output json
+
+aws rds describe-db-subnet-groups \
+  --db-subnet-group-name cinegraph-e4-rds-subnets \
+  --query 'DBSubnetGroups[0].{Name:DBSubnetGroupName,Status:SubnetGroupStatus,Subnets:Subnets[].[SubnetIdentifier,SubnetAvailabilityZone.Name,SubnetStatus]}' \
+  --output json
+
+aws rds describe-orderable-db-instance-options \
+  --engine postgres \
+  --db-instance-class db.t3.micro \
+  --max-items 10 \
+  --query 'OrderableDBInstanceOptions[].[EngineVersion,DBInstanceClass,StorageType,SupportsStorageEncryption]' \
+  --output table
+```
+
+**No ejecutar `rds create-db-instance` aún**. Revisar esta salida y escoger una versión de PostgreSQL realmente ofertada para `db.t3.micro`, almacenamiento y mecanismo de credenciales permitido por el Learner Lab. Plan previsto: RDS privado y Single-AZ, datos cifrados, mínimo privilegio y sin contraseñas en Git ni historial de shell. `--manage-master-user-password` utiliza AWS Secrets Manager y requiere permisos adicionales: comprobarlos antes de elegirlo.
+
 
 
 ## Próximas fases
