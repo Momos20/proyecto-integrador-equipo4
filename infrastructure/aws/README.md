@@ -49,7 +49,8 @@ Los nombres S3 deben ser globalmente únicos. Si hay colisión, el despliegue fa
 | 25 | Auditar preparación de usuario SQL y cuentas demo | **Completo**: ningún secreto ni cuenta existente, esquema verificado |
 | 26 | Crear identidad SQL y cuentas demo segregadas | **Completo**: dos secretos creados, rol cinegraph_app, tres cuentas, login TLS validado |
 | 27 | Probar lectura del secreto y catálogo desde contenedor aislado | **Completo**: APP_DB_SMOKE_SUCCESS, IAM, TLS, 87585 películas, 3 cuentas |
-| 28 | Iniciar Flask/Gunicorn en EC2 solo loopback | **Siguiente**: Compose exclusivo de AWS; API local, sin HTTPS público |
+| 28 | Iniciar Flask/Gunicorn en EC2 solo loopback | **Completo**: Compose healthy, /health, /api/ready y /api/catalog OK |
+| 29 | Verificar login/logout de cuentas demo y rutas privadas | **Siguiente**: Flask test_client HTTPS simulado desde EC2, sin escrituras |
 
 
 
@@ -1513,6 +1514,73 @@ aws ssm get-command-invocation \
 Se espera `Success`, código `0`, `SESSION_KEY_PRESENT`, contenedor `cinegraph-e4-app` `healthy`, `HTTP_HEALTH_OK`, `HTTP_RDS_READY_OK`, `HTTP_MOVIELENS_CATALOG_OK: 2`, `CINEGRAPH_WEB_LOCAL_READY`. Si `wait` falla, consultar el mismo `COMMAND_ID` mediante `get-command-invocation`, sin reenviar el arranque. Un error que no muestre detalles puede diagnosticarse con una nueva consulta SSM que ejecute `docker ps -a --filter name=cinegraph-e4-app`; evitar `docker inspect` con Environment o imprimir `/proc`, pues el proceso contiene credenciales.
 
 **No abrir inbound 8000/80 ni compartir el login por HTTP.** La aplicación, una vez validada localmente, está lista para conectarse a un reverse proxy con HTTPS real y posteriormente integrar el pipeline Kinesis/S3. Recomendaciones A9 todavía dependen de una publicación verificable de scoring real.
+
+## Paso 28 — Web privada Flask/Gunicorn en ejecución (confirmado)
+
+El despliegue `08-launch-web.sh` mediante SSM terminó con `Status=Success` y código `0`. La imagen `cinegraph-e4-app:main` quedó levantada con Docker Compose como `cinegraph-e4-app`, en estado `Up (healthy)` y con publicación exclusiva `127.0.0.1:8000->8000/tcp`. Salida real:
+
+```text
+SESSION_KEY_PRESENT
+HTTP_HEALTH_OK
+HTTP_RDS_READY_OK
+HTTP_MOVIELENS_CATALOG_OK: 2
+CINEGRAPH_WEB_LOCAL_READY: sin acceso publico
+```
+
+**Interpretación:** Flask/Gunicorn está conectado a RDS, consulta el catálogo MovieLens y mantiene el puerto cerrado al exterior. No implica que el sitio sea accesible por la IP pública de EC2, que exista un certificado HTTPS o que se haya verificado aún el login.
+
+## Paso 29 — Prueba de sesiones y autenticación reales, sin exponer el sitio
+
+Script de prueba nuevo `infrastructure/aws/scripts/09-auth-smoke.py`. Se transmite por stdin al intérprete Python **del contenedor que ya está ejecutándose**, mediante `docker exec -i`. No requiere construir nuevamente la imagen ni cambiar el Compose. Obtiene desde la propia EC2 los secretos `cinegraph-e4-app-db` y `cinegraph-e4-demo-users` en memoria; usa Flask `test_client` con un origen HTTPS **simulado** (`https://cinegraph.local`, no DNS ni certificado público) y comprueba:
+
+- Respuesta del frontend y CSS real.
+- Lectura de catálogo MovieLens y rechazo HTTP 401 sin autenticación.
+- Login de cuenta ficticia `cine414` con CSRF, cookie `Secure`/`HttpOnly` y sesión persistente.
+- Lecturas de `/api/watchlist` e `/api/interactions` con el ID 414.
+- Manejo honesto de `/api/recommendations`: `404 no_recommendations` si A9 aún no está publicado, o payload A9 validado si existe.
+- Logout y retorno a HTTP 401.
+
+No modifica filas de PostgreSQL: `POST /api/auth/login` y `POST /api/auth/logout` afectan solo la sesión firmada de prueba. **No se crean interacciones ni usuarios.** Tampoco se imprimen contraseñas, claves de sesión ni tokens.
+
+**CloudShell — comando SSM:**
+
+```bash
+cd ~/cinegraph-aws
+git pull --ff-only origin main
+unset AWS_PROFILE
+export AWS_REGION=us-east-1
+WEB_INSTANCE_ID=i-0e3288445cb0df13d
+
+PARAMS="$(python3 - <<'PY'
+import json
+commands = [
+    "set -euo pipefail",
+    "git -C /opt/cinegraph/source pull --ff-only origin main",
+    "docker ps --filter name=cinegraph-e4-app --filter status=running --format '{{.Names}}' | grep -Fx cinegraph-e4-app >/dev/null",
+    "docker exec -i cinegraph-e4-app python - < /opt/cinegraph/source/infrastructure/aws/scripts/09-auth-smoke.py",
+]
+print(json.dumps({"commands":commands}))
+PY
+)"
+
+COMMAND_ID="$(aws ssm send-command \
+  --instance-ids "$WEB_INSTANCE_ID" \
+  --document-name AWS-RunShellScript \
+  --comment 'CineGraph: validar autenticacion, CSRF y logout sin exponer sitio' \
+  --parameters "$PARAMS" \
+  --query 'Command.CommandId' --output text)"
+
+echo "SSM CommandId: $COMMAND_ID"
+aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$WEB_INSTANCE_ID"
+aws ssm get-command-invocation \
+  --command-id "$COMMAND_ID" --instance-id "$WEB_INSTANCE_ID" \
+  --query '{Estado:Status,Codigo:ResponseCode,Salida:StandardOutputContent,Error:StandardErrorContent}' \
+  --output json
+```
+
+**Esperado:** `Success`, código `0`, `AUTH_TEST_FRONTEND_OK`, `AUTH_TEST_LOGIN_OK: cine414; secure cookie`, `AUTH_TEST_PRIVATE_READS_OK`, `AUTH_TEST_LOGOUT_OK` y `CINEGRAPH_AUTH_SMOKE_SUCCESS: sin escrituras a RDS`.
+
+La prueba no hace HTTPS de red; solo simula el contexto HTTPS de Flask para verificar cookies y CSRF. **No compartir IP pública ni habilitar login por HTTP.** Tras verificar autenticación, el siguiente objetivo es evaluar una URL de demostración HTTPS real, conforme a los permisos de AWS Academy, y luego integrar la publicación de predicciones GraphSAGE A9.
 
 ## Próximas fases
 
