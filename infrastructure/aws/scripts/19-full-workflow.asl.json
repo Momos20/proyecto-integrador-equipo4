@@ -1,0 +1,370 @@
+{
+  "Comment": "Historical A9 replay; behavioral ETL independent of historical model inputs. No retraining.",
+  "StartAt": "Init",
+  "States": {
+    "Init": {
+      "Type": "Pass",
+      "Parameters": {
+        "prefix.$": "States.Format('predictions/a9/2023-06-15/orchestrated-{}', $$.Execution.Name)",
+        "attempt": 0
+      },
+      "Next": "ETL"
+    },
+    "ETL": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startJobRun.sync",
+      "Parameters": {
+        "JobName": "cinegraph-e4-behavioral-etl"
+      },
+      "ResultPath": null,
+      "TimeoutSeconds": 900,
+      "Next": "StartWorker"
+    },
+    "StartWorker": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:ec2:startInstances",
+      "Parameters": {
+        "InstanceIds": [
+          "i-03306ae6540b03d3e"
+        ]
+      },
+      "ResultPath": null,
+      "Next": "BootWait",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "ResultPath": "$.error",
+          "Next": "Failed"
+        }
+      ]
+    },
+    "BootWait": {
+      "Type": "Wait",
+      "Seconds": 30,
+      "Next": "CheckOnline"
+    },
+    "CheckOnline": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:ssm:describeInstanceInformation",
+      "Parameters": {
+        "Filters": [
+          {
+            "Key": "InstanceIds",
+            "Values": [
+              "i-03306ae6540b03d3e"
+            ]
+          },
+          {
+            "Key": "PingStatus",
+            "Values": [
+              "Online"
+            ]
+          }
+        ]
+      },
+      "ResultPath": "$.online",
+      "Next": "OnlineChoice",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "ResultPath": "$.error",
+          "Next": "StopOnFailure"
+        }
+      ]
+    },
+    "OnlineChoice": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.online.InstanceInformationList[0].PingStatus",
+          "StringEquals": "Online",
+          "Next": "SendScore"
+        },
+        {
+          "Variable": "$.attempt",
+          "NumericGreaterThanEquals": 20,
+          "Next": "StopOnFailure"
+        }
+      ],
+      "Default": "IncrementBoot"
+    },
+    "IncrementBoot": {
+      "Type": "Pass",
+      "Parameters": {
+        "prefix.$": "$.prefix",
+        "attempt.$": "States.MathAdd($.attempt,1)"
+      },
+      "Next": "BootWait"
+    },
+    "SendScore": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:ssm:sendCommand",
+      "Parameters": {
+        "InstanceIds": [
+          "i-03306ae6540b03d3e"
+        ],
+        "DocumentName": "AWS-RunShellScript",
+        "Parameters": {
+          "commands.$": "States.Array(States.Format('set -euo pipefail; exec 9>/var/lock/cinegraph-a9.lock; flock -n 9; cd /opt/cinegraph-a9; swapon --show=NAME --noheadings | grep -Fxq /swap-a9 || swapon /swap-a9; aws s3 cp s3://cinegraph-e4-datalake-023914826547-us-east-1/scripts/a9/19-a9-replay.py replay.py; OMP_NUM_THREADS=2 MKL_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 PREDICTION_PREFIX={} venv/bin/python -u replay.py', $.prefix))",
+          "executionTimeout": [
+            "600"
+          ]
+        },
+        "TimeoutSeconds": 120
+      },
+      "ResultPath": "$.score",
+      "Next": "ResetScore",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "ResultPath": "$.error",
+          "Next": "StopOnFailure"
+        }
+      ]
+    },
+    "ResetScore": {
+      "Type": "Pass",
+      "Parameters": {
+        "prefix.$": "$.prefix",
+        "score.$": "$.score",
+        "attempt": 0
+      },
+      "Next": "ScoreWait"
+    },
+    "ScoreWait": {
+      "Type": "Wait",
+      "Seconds": 15,
+      "Next": "CheckScore"
+    },
+    "CheckScore": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:ssm:getCommandInvocation",
+      "Parameters": {
+        "CommandId.$": "$.score.Command.CommandId",
+        "InstanceId": "i-03306ae6540b03d3e"
+      },
+      "ResultPath": "$.status",
+      "Next": "ScoreChoice",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "ResultPath": "$.error",
+          "Next": "StopOnFailure"
+        }
+      ]
+    },
+    "ScoreChoice": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.status.Status",
+          "StringEquals": "Success",
+          "Next": "StopWorker"
+        },
+        {
+          "Or": [
+            {
+              "Variable": "$.status.Status",
+              "StringEquals": "Pending"
+            },
+            {
+              "Variable": "$.status.Status",
+              "StringEquals": "InProgress"
+            },
+            {
+              "Variable": "$.status.Status",
+              "StringEquals": "Delayed"
+            }
+          ],
+          "Next": "ScoreLimit"
+        }
+      ],
+      "Default": "StopOnFailure"
+    },
+    "ScoreLimit": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.attempt",
+          "NumericGreaterThanEquals": 55,
+          "Next": "StopOnFailure"
+        }
+      ],
+      "Default": "IncrementScore"
+    },
+    "IncrementScore": {
+      "Type": "Pass",
+      "Parameters": {
+        "prefix.$": "$.prefix",
+        "score.$": "$.score",
+        "attempt.$": "States.MathAdd($.attempt,1)"
+      },
+      "Next": "ScoreWait"
+    },
+    "StopWorker": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:ec2:stopInstances",
+      "Parameters": {
+        "InstanceIds": [
+          "i-03306ae6540b03d3e"
+        ]
+      },
+      "ResultPath": null,
+      "Next": "SendPublish",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "ResultPath": "$.error",
+          "Next": "Failed"
+        }
+      ]
+    },
+    "SendPublish": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:ssm:sendCommand",
+      "Parameters": {
+        "InstanceIds": [
+          "i-0e3288445cb0df13d"
+        ],
+        "DocumentName": "AWS-RunShellScript",
+        "Parameters": {
+          "commands.$": "States.Array(States.Format('set -euo pipefail; cd /opt/cinegraph/source; git pull --ff-only origin main; docker exec -i -e RDS_SECRET_ARN=__SECRET_ARN__ -e A9_PREDICTION_PREFIX={} cinegraph-e4-app python - < infrastructure/aws/scripts/18-publish-a9.py; docker exec -i cinegraph-e4-app python - < infrastructure/aws/scripts/09-auth-smoke.py', $.prefix))",
+          "executionTimeout": [
+            "300"
+          ]
+        },
+        "TimeoutSeconds": 120
+      },
+      "ResultPath": "$.publish",
+      "Next": "ResetPublish",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "ResultPath": "$.error",
+          "Next": "Failed"
+        }
+      ]
+    },
+    "ResetPublish": {
+      "Type": "Pass",
+      "Parameters": {
+        "prefix.$": "$.prefix",
+        "publish.$": "$.publish",
+        "attempt": 0
+      },
+      "Next": "PublishWait"
+    },
+    "PublishWait": {
+      "Type": "Wait",
+      "Seconds": 15,
+      "Next": "CheckPublish"
+    },
+    "CheckPublish": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:ssm:getCommandInvocation",
+      "Parameters": {
+        "CommandId.$": "$.publish.Command.CommandId",
+        "InstanceId": "i-0e3288445cb0df13d"
+      },
+      "ResultPath": "$.status",
+      "Next": "PublishChoice",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "ResultPath": "$.error",
+          "Next": "Failed"
+        }
+      ]
+    },
+    "PublishChoice": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.status.Status",
+          "StringEquals": "Success",
+          "Next": "Done"
+        },
+        {
+          "Or": [
+            {
+              "Variable": "$.status.Status",
+              "StringEquals": "Pending"
+            },
+            {
+              "Variable": "$.status.Status",
+              "StringEquals": "InProgress"
+            },
+            {
+              "Variable": "$.status.Status",
+              "StringEquals": "Delayed"
+            }
+          ],
+          "Next": "PublishLimit"
+        }
+      ],
+      "Default": "Failed"
+    },
+    "PublishLimit": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.attempt",
+          "NumericGreaterThanEquals": 30,
+          "Next": "Failed"
+        }
+      ],
+      "Default": "IncrementPublish"
+    },
+    "IncrementPublish": {
+      "Type": "Pass",
+      "Parameters": {
+        "prefix.$": "$.prefix",
+        "publish.$": "$.publish",
+        "attempt.$": "States.MathAdd($.attempt,1)"
+      },
+      "Next": "PublishWait"
+    },
+    "StopOnFailure": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:ec2:stopInstances",
+      "Parameters": {
+        "InstanceIds": [
+          "i-03306ae6540b03d3e"
+        ]
+      },
+      "ResultPath": null,
+      "Next": "Failed",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "ResultPath": "$.error",
+          "Next": "Failed"
+        }
+      ]
+    },
+    "Failed": {
+      "Type": "Fail",
+      "Error": "CineGraphPipelineFailed",
+      "Cause": "Inspect execution history and confirm worker stopped"
+    },
+    "Done": {
+      "Type": "Succeed"
+    }
+  }
+}
