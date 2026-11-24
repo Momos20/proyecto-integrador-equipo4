@@ -933,6 +933,8 @@ Código reproducible: `infrastructure/aws/scripts/03-bootstrap-rds.py`. Se ejecu
 
 El script tiene dos modos: `--plan` consulta el estado de PostgreSQL sin hacer escrituras; `--apply` ejecutará después los cinco SQL de esquema/migraciones y cargará las 87.585 películas desde las tres partes originales, verificando MD5 y filas. `--apply` está protegido por `CONFIRM_RDS_IMPORT=YES`, usa una única transacción y no crea usuarios de login ni recomendaciones ficticias.
 
+Para evitar ambigüedad en PostgreSQL, el `INSERT ... SELECT ... ON CONFLICT` del importador incluye `WHERE TRUE` antes de la cláusula de conflicto. El script también verifica que la tabla importada tenga exactamente 87.585 filas y aborta sin borrar filas si encuentra un recuento inesperado.
+
 La contraseña maestra de `cinegraphadmin` solo se recupera **dentro del proceso Python del contenedor**, mediante boto3 y `LabRole`, y se conserva en memoria durante la operación. Los comandos SSM incluyen únicamente el ARN de un secreto, **no** su valor. El script requiere TLS `verify-full` y descarga el CA bundle oficial de RDS a un directorio temporal de memoria. Ver: documentación oficial AWS sobre certificados y `sslmode=verify-full`: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.SSL.html
 
 **En CloudShell — ejecutar SOLO `--plan` (sin cambios en RDS):**

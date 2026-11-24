@@ -173,6 +173,7 @@ def apply(conn, movies: list[tuple[int, str, int | None, list[str]]]) -> None:
         conn.execute(
             """INSERT INTO movies (movie_id,title,release_year,genres)
                SELECT movie_id,title,release_year,genres FROM _cinegraph_incoming_movies
+               WHERE TRUE
                ON CONFLICT (movie_id) DO UPDATE SET
                  title = EXCLUDED.title,
                  release_year = EXCLUDED.release_year,
