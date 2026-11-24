@@ -37,7 +37,9 @@ Los nombres S3 deben ser globalmente únicos. Si hay colisión, el despliegue fa
 | 13 | Verificar preparación EC2 | **Completo**: subred pública, rutas IGW, AMI AL2023, LabInstanceProfile y SG sin ingreso; secreto RDS activo |
 | 14 | Verificar AMI, IAM/SSM y plantilla de EC2 | **Completo**: AL2023 disponible, rol con AmazonSSMManagedInstanceCore, YAML válido |
 | 15 | Crear EC2 `cinegraph-e4-web` | **Completo**: `CREATE_COMPLETE`; EC2 `running` y SSM `Online` |
-| 16 | Verificar Docker y bootstrap en EC2 | **Siguiente**: comando remoto por SSM, sin abrir SSH |
+| 16 | Verificar Docker y bootstrap en EC2 | **Completo**: SSM Success, código 0, Docker activo, cloud-init done |
+| 17 | Comprobar requisitos de app y acceso EC2 → RDS | **Siguiente**: diagnóstico remoto por SSM, sin publicar servicio |
+
 
 
 **No quedan recursos de la primera pila**, según el resultado de CloudShell que compartió el equipo. Los scripts temporales de limpieza ya no forman parte del repositorio.
@@ -585,6 +587,81 @@ Si el comando todavía muestra `Pending` o `InProgress`, volver a ejecutar **sol
 Si aparece `AccessDeniedException` en `ssm send-command`, no abrir SSH como alternativa inmediata: primero revisar los permisos del rol CloudShell/Learner Lab. Si Docker no está activo, inspeccionar `/var/log/cinegraph-bootstrap.log` por SSM y corregir solo después de localizar el error.
 
 **Próxima fase:** aplicación Flask y esquemas de MovieLens en RDS; usar un Compose exclusivo para AWS **sin PostgreSQL local ni Floci**. Ninguna contraseña puede incorporarse al YAML/Compose ni registrarse en Github. Antes de habilitar el inicio de sesión del equipo por Internet, disponer de una URL HTTPS válida.
+
+## Paso 16 — Bootstrap de EC2 confirmado
+
+Se ejecutó un `AWS-RunShellScript` mediante SSM contra `i-0e3288445cb0df13d`. Evidencia real: `CommandId=4fda78dd-5bd8-4c37-be82-0821d0c683c8`, estado `Success`, código `0`, servicio Docker `active`, `Docker version 25.0.14`, `cloud-init status: done` y directorio `/opt/cinegraph` existente. EC2 no expone SSH ni HTTP.
+
+## Paso 17 — Verificación previa al backend (siguiente paso)
+
+CineGraph utiliza Flask/Gunicorn, SQLAlchemy/psycopg y PostgreSQL RDS. El repositorio público puede clonarse en EC2, pero **no se desplegará la app hasta validar conectividad y permisos del rol**. No utilizar el Compose local: incluye PostgreSQL y Floci, que deben permanecer solo en la Mac.
+
+**Diagnóstico desde CloudShell por SSM.** No imprime contraseñas, no crea usuarios de base de datos, no expone puertos ni modifica el sistema de archivos. Comprueba Docker Compose, Git, Python/AWS CLI, DNS, TCP hacia RDS y metadatos del secreto (no el valor). El permiso para leer la contraseña secreta y la autenticación real se comprobarán en una fase separada, con manejo seguro del secreto.
+
+```bash
+cd ~/cinegraph-aws
+git pull --ff-only origin main
+unset AWS_PROFILE
+export AWS_REGION=us-east-1
+
+WEB_INSTANCE_ID="$(aws cloudformation describe-stacks \
+  --stack-name cinegraph-e4-web \
+  --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue | [0]" \
+  --output text)"
+
+RDS_ENDPOINT="$(aws cloudformation describe-stacks \
+  --stack-name cinegraph-e4-postgres \
+  --query "Stacks[0].Outputs[?OutputKey=='DatabaseEndpoint'].OutputValue | [0]" \
+  --output text)"
+
+RDS_SECRET_ARN="$(aws rds describe-db-instances \
+  --db-instance-identifier cinegraph-e4-postgres \
+  --query 'DBInstances[0].MasterUserSecret.SecretArn' \
+  --output text)"
+
+# Solo valores no secretos. El ARN no contiene la contraseña.
+echo "Instancia: $WEB_INSTANCE_ID | RDS: $RDS_ENDPOINT"
+
+COMMAND_ID="$(aws ssm send-command \
+  --instance-ids "$WEB_INSTANCE_ID" \
+  --document-name AWS-RunShellScript \
+  --comment 'CineGraph: preflight aplicacion y RDS' \
+  --parameters "$(python3 - "$RDS_ENDPOINT" "$RDS_SECRET_ARN" <<'PY'
+import json,sys
+host,secret=sys.argv[1:3]
+commands=[
+  "echo ==== Docker ====",
+  "docker --version",
+  "docker compose version || echo COMPOSE_NO_DISPONIBLE",
+  "echo ==== Git ====",
+  "git --version || echo GIT_NO_DISPONIBLE",
+  "echo ==== AWS CLI ====",
+  "aws --version || echo AWS_CLI_NO_DISPONIBLE",
+  "echo ==== DNS RDS ====",
+  f"getent ahostsv4 {host} | head -n 1",
+  "echo ==== TCP RDS ====",
+  f"timeout 5 bash -c 'cat < /dev/null > /dev/tcp/{host}/5432' && echo RDS_TCP_OK || echo RDS_TCP_ERROR",
+  "echo ==== Secret metadata (no valor) ====",
+  f"aws secretsmanager describe-secret --secret-id '{secret}' --query '{{Name:Name,DeletedDate:DeletedDate}}' --output json || echo SECRET_DESCRIBE_SIN_PERMISOS"
+]
+print(json.dumps({"commands":commands},separators=(',',':')))
+PY
+)" \
+  --query 'Command.CommandId' --output text)"
+
+echo "CommandId: $COMMAND_ID"
+aws ssm wait command-executed \
+  --command-id "$COMMAND_ID" --instance-id "$WEB_INSTANCE_ID"
+
+aws ssm get-command-invocation \
+  --command-id "$COMMAND_ID" --instance-id "$WEB_INSTANCE_ID" \
+  --query '{Estado:Status,Codigo:ResponseCode,Salida:StandardOutputContent,Error:StandardErrorContent}' \
+  --output json
+```
+
+El `docker compose` puede no venir con el paquete `docker` de AL2023. En ese caso instalaremos el complemento mediante método verificable antes de desplegar la app. Si el puerto 5432 no está accesible, **no abrir RDS a Internet**: revisar Security Groups y rutas internas.
+
+**Seguridad:** este preflight no recupera ni imprime `SecretString`. Los permisos IAM para `secretsmanager:GetSecretValue` pueden diferir de los de `DescribeSecret`. Por eso un `SECRET_DESCRIBE_SIN_PERMISOS` no debe resolverse guardando contraseñas en GitHub ni CloudShell.
 
 ## Próximas fases
 
