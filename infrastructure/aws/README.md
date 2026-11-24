@@ -1741,3 +1741,11 @@ Configurar Step Functions, EventBridge y CloudWatch según roles disponibles. Ac
 - Glue job cinegraph-e4-behavioral-etl, run jr_30cd3798b8dfa90bf758758b9074374757b1ce49a3ef9f67de10bb609a5da04c SUCCEEDED. Snapshot 3249895e35672b0848231d08: 5 líneas, 5 válidas, 0 duplicados, 0 inválidas, 1 fila user_daily y 1 fila user_movie_daily. Salidas y SHA-256 verificados.
 - A9 checkpoint SHA-256 8c9aa61fb7e8d3ed3a6476fe759f9861283387bc6561ea5aa03595ab516a2358 verificado; modelo, configuración y bundle cargados a models/a9/ en S3.
 - SageMaker CreateProcessingJob rechazado por explicit deny de Pvoclabs2. No hubo inferencia ni job creado. No modificar IAM ni intentar eludir la política. Evaluar EC2 independiente como servicio de cómputo alternativo autorizado por el laboratorio; si el laboratorio no permite este cómputo, escalar al docente.
+
+## Evidencia paso 39 — Orquestación behavioral
+
+- EC2 RunInstances t3.xlarge dry-run rechazado por explicit deny Pvoclabs2. No se creó una instancia. Inferencia A9 y publicación Top-K pendientes.
+- Step Functions cinegraph-e4-behavioral: ejecución manual-20261124030320 SUCCEEDED, 24 noviembre 2026 UTC; integración Glue startJobRun.sync verificada.
+- EventBridge cinegraph-e4-behavioral-daily: destino BehavioralETL configurado; cron 07:00 UTC, regla deshabilitada para conservar presupuesto. No se ha validado disparo programado.
+- CloudWatch: cinegraph-e4-firehose-delivery-failure OK; cinegraph-e4-etl-execution-failed INSUFFICIENT_DATA al consultar. Alarmas configuradas, notificación de fallos no verificada.
+- BEHAVIORAL_ORCHESTRATION_VERIFIED. El workflow actual solo ejecuta ETL behavioral; no incluye GraphSAGE ni publicación de recomendaciones.
