@@ -33,7 +33,8 @@ Los nombres S3 deben ser globalmente únicos. Si hay colisión, el despliegue fa
 | 9 | Desplegar red privada `cinegraph-e4-db-network` | **Completo**: `CREATE_COMPLETE`; dos subredes privadas y DB Subnet Group |
 | 10 | Verificar subredes, rutas, SG y oferta RDS | **Completo**: red privada validada; salida de oferta paginada | 
 | 11 | Consultar ofertas PostgreSQL 16/gp3 | **Completo**: 16.9–16.15, `db.t3.micro`, gp3, cifrado |
-| 12 | Preparar PostgreSQL 16.15 privado | **Siguiente**: validar y desplegar plantilla 03 |
+| 12 | Crear PostgreSQL 16.15 privado | **Completo**: CloudFormation `CREATE_COMPLETE`, instancia `available` |
+| 13 | Preparar servidor de CineGraph EC2 | **Siguiente**: validaciones de acceso, subred pública y AMI; sin crear recursos |
 
 **No quedan recursos de la primera pila**, según el resultado de CloudShell que compartió el equipo. Los scripts temporales de limpieza ya no forman parte del repositorio.
 
@@ -232,7 +233,7 @@ Solo tras verificar la versión y presupuesto se preparará la creación con nom
 
 Salida real de AWS Academy: versiones `16.9`, `16.10`, `16.11`, `16.12`, `16.13`, `16.14` y `16.15` con `db.t3.micro`, `gp3` y `SupportsStorageEncryption=True`. Se selecciona `16.15` por compatibilidad con PostgreSQL 16 del entorno local.
 
-## Paso 12 — Instancia PostgreSQL RDS (por comandos)
+## Paso 12 — Instancia PostgreSQL RDS (creada y verificada)
 
 Plantilla `cloudformation/03-rds-postgres.yaml`: una instancia `cinegraph-e4-postgres`, PostgreSQL 16.15, `db.t3.micro`, 20 GiB gp3 cifrados, Single-AZ, `PubliclyAccessible=false`, `cinegraph-e4-rds-subnets` y Security Group de RDS. La base inicial es `cinegraph`. El usuario maestro es `cinegraphadmin`, **no es usuario de aplicación**.
 
@@ -297,6 +298,79 @@ aws cloudformation describe-stack-events \
   --query 'StackEvents[].[Timestamp,LogicalResourceId,ResourceStatus,ResourceStatusReason]' \
   --output table
 ```
+
+### Resultado real de la creación RDS
+
+La cuenta AWS Academy confirmó lo siguiente:
+
+| Verificación | Valor |
+|---|---|
+| Stack | `cinegraph-e4-postgres` |
+| Estado de CloudFormation | `CREATE_COMPLETE` |
+| Estado RDS | `available` |
+| Motor | PostgreSQL `16.15` |
+| Base de datos | `cinegraph` |
+| Endpoint privado | `cinegraph-e4-postgres.c3ycssa0e3xz.us-east-1.rds.amazonaws.com` |
+| Puerto | `5432` |
+| `PubliclyAccessible` | `false` |
+| `StorageEncrypted` | `true` |
+
+**Esto valida la instancia, no el esquema de aplicación:** aún no se han aplicado migraciones, importado el catálogo MovieLens ni publicado recomendaciones A9 en AWS. No se debe utilizar `scripts/local_setup/bootstrap.py` apuntando a RDS: está limitado deliberadamente a PostgreSQL local.
+
+## Paso 13 — Preparación de EC2 (solo lectura; siguiente paso)
+
+Meta: EC2 en **subred pública existente**, con `LabInstanceProfile`, acceso administrativo mediante AWS Systems Manager si los permisos permiten conectarlo, frontend/backend Flask en contenedor **separado** de la base RDS. La base queda en subred privada. Antes de crear EC2, verificar la subred, ruta al IGW, AMI disponible, rol y secreto administrado. **Todavía no publicar formularios de inicio de sesión hasta implementar HTTPS válido.**
+
+```bash
+cd ~/cinegraph-aws
+git pull --ff-only origin main
+unset AWS_PROFILE
+export AWS_REGION=us-east-1
+export VPC_ID=vpc-083d9bebc31224f94
+
+# Subred PUBLICA existente en us-east-1a (no la subred nueva de RDS).
+export WEB_SUBNET_ID=subnet-07413c35ec3498c14
+aws ec2 describe-subnets \
+  --subnet-ids "$WEB_SUBNET_ID" \
+  --query 'Subnets[0].{Id:SubnetId,AZ:AvailabilityZone,CIDR:CidrBlock,PublicIpOnLaunch:MapPublicIpOnLaunch,VPC:VpcId}' \
+  --output json
+
+# Comprueba rutas/IGW. Si la subred hereda la tabla principal, puede no
+# aparecer como asociacion de subred explicita; inspeccionar tabla Main.
+aws ec2 describe-route-tables \
+  --filters "Name=vpc-id,Values=$VPC_ID" \
+  --query 'RouteTables[].{Id:RouteTableId,Associations:Associations[].[Main,SubnetId],Routes:Routes[].[DestinationCidrBlock,GatewayId,State]}' \
+  --output json
+
+# Verificar el perfil de instancia para acceso AWS sin claves fijas.
+aws iam get-instance-profile \
+  --instance-profile-name LabInstanceProfile \
+  --query 'InstanceProfile.{Name:InstanceProfileName,Roles:Roles[].RoleName}' \
+  --output json
+
+# AMI Amazon Linux 2023 x86_64, administrada por AWS.
+aws ssm get-parameter \
+  --name /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 \
+  --query 'Parameter.Value' \
+  --output text
+
+# SG aplicación: sin acceso público por ahora.
+aws ec2 describe-security-groups \
+  --group-ids sg-0ac188ee36ce97e55 \
+  --query 'SecurityGroups[0].{Id:GroupId,Ingress:IpPermissions,Egress:IpPermissionsEgress}' \
+  --output json
+
+# Estado del secreto, SIN leer ni imprimir la contraseña.
+aws rds describe-db-instances \
+  --db-instance-identifier cinegraph-e4-postgres \
+  --query 'DBInstances[0].{MasterUser:MasterUsername,SecretStatus:MasterUserSecret.SecretStatus,Public:PubliclyAccessible,Endpoint:Endpoint.Address}' \
+  --output json
+```
+
+Si `ssm get-parameter` muestra `AccessDenied`, puede consultarse la AMI mediante `ec2 describe-images` (solo lectura) antes de desplegar. El siguiente paso después de validar será diseñar/crear `cinegraph-e4-web` con EC2 y acceso seguro a RDS, y preparar un Compose **AWS** sin contenedor `db` ni Floci.
+
+**Costos:** `cinegraph-e4-postgres` está activo y consume presupuesto de AWS Academy incluso sin tráfico. EC2 agregará costos de instancia/IPv4 pública; consultar el presupuesto disponible del Learner Lab antes del despliegue. No exponer 5432 al exterior ni registrar valores de Secrets Manager en CloudShell o Git.
+
 
 ## Próximas fases
 
