@@ -1763,3 +1763,11 @@ Ejecutar `bash infrastructure/aws/scripts/17-a9-ec2.sh` desde CloudShell. Detene
 - Publicación SSM c51eba8e-4913-42d2-8844-574017e9dd4c: Success. A9_S3_VALIDATED; A9_RDS_PUBLISHED: 30 recommendations, 3 users, run_id=1; AUTH_TEST_A9_PUBLISHED: GraphSAGE real; CINEGRAPH_AUTH_SMOKE_SUCCESS. Se verificó la API autenticada de cine414, no las tres cuentas desde navegador.
 - Worker EC2: solicitud de detención aceptada, estado stopping al consultar. Confirmar stopped. Web y RDS permanecen activos.
 - El workflow de Step Functions verificado sigue siendo behavioral ETL; scoring y publicación se ejecutaron manualmente vía SSM, no mediante el workflow diario. EventBridge sigue deshabilitado. No se ha demostrado entrenamiento periódico ni realimentación del modelo con eventos 2026.
+
+## Paso 41 — Workflow integral verificado
+
+- Step Functions `cinegraph-e4-a9-replay`, ejecución `manual-20261124031918`, 24 noviembre 2026 UTC: SUCCEEDED, A9_FULL_WORKFLOW_VERIFIED.
+- Flujo: Glue behavioral ETL → arranque EC2 t3.large → SSM replay A9 con checkpoint y dataset verificados → S3 → detención EC2 → publicación/verificación idempotente de ranking histórico RDS → smoke test autenticado. El script comprueba worker stopped antes de emitir el indicador final.
+- El ranking histórico 2023-06-15 se conserva sin duplicar registros. Los eventos de 2026 no alimentan el modelo; no hubo reentrenamiento.
+- EventBridge behavioral continúa deshabilitado. No se ha probado un disparo programado del workflow integral; no se programa el replay histórico recurrente para evitar consumo innecesario.
+- Captura del navegador aportada por el equipo: cine414 autenticado, ranking A9 visible con corte 2023-06-15. Worker detenido tras la primera publicación, confirmado por describe-instances.
