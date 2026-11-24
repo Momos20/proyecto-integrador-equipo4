@@ -887,7 +887,7 @@ commands = [
     "aws secretsmanager get-secret-value --secret-id " + shlex.quote(secret_arn) + " --query ARN --output text >/dev/null && echo SECRET_ACCESS_OK",
     "cd /opt/cinegraph/source",
     "test -f database/schema/001_init.sql && test -f database/schema/002_views.sql && test -f database/schema/003_user_interactions.sql && test -f database/migrations/004_cinegraph_accounts_catalog.sql && test -f database/migrations/005_watchlist_remove.sql && echo SQL_FILES_OK",
-    "cat data/reference/movielens32m/parts/movies.part0{1,2,3}.csv | md5sum | awk '{print $1}' | grep -Fx '0df90835c19151f9d819d0822e190797' >/dev/null && echo MOVIELENS_MD5_OK",
+    "cat data/reference/movielens32m/parts/movies.part01.csv data/reference/movielens32m/parts/movies.part02.csv data/reference/movielens32m/parts/movies.part03.csv | md5sum | awk '{print $1}' | grep -Fx '0df90835c19151f9d819d0822e190797' >/dev/null && echo MOVIELENS_MD5_OK",
 ]
 print(json.dumps({"commands":commands}))
 PY
