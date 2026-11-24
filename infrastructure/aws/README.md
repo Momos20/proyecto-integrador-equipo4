@@ -40,7 +40,8 @@ Los nombres S3 deben ser globalmente únicos. Si hay colisión, el despliegue fa
 | 16 | Verificar Docker y bootstrap en EC2 | **Completo**: SSM Success, código 0, Docker activo, cloud-init done |
 | 17 | Comprobar requisitos de app y acceso EC2 → RDS | **Completo**: DNS y TCP 5432 correctos, faltan Git y Compose |
 | 18 | Instalar Git y Docker Compose verificado | **Completo**: Git 2.50.1, Compose v5.6.0, SHA-256 correcto; Docker activo |
-| 19 | Actualizar Docker Buildx para Compose | **Siguiente**: actualizar plugin Buildx y verificar, sin levantar la aplicación |
+| 19 | Actualizar Docker Buildx para Compose | **Completo**: Buildx v0.29.1, plugin verificado, BuildKit operativo |
+| 20 | Clonar fuente y construir imagen Flask en EC2 | **Siguiente**: solo imagen local; no iniciar app, migrar RDS ni abrir puertos |
 
 
 
@@ -783,6 +784,68 @@ aws ssm get-command-invocation \
 Se espera `Success`, `/tmp/cinegraph-buildx: OK`, `github.com/docker/buildx v0.29.1`, `docker buildx ls` y Docker `active`. Si falla `wait`, consultar el mismo `COMMAND_ID` con `get-command-invocation` antes de reintentar. Si el nuevo Buildx produce incompatibilidad, retirar **solo** el archivo instalado en `/usr/local/lib/docker/cli-plugins/docker-buildx` mediante SSM para volver al plugin original, sin afectar Docker Engine.
 
 **Después:** comprobar `docker compose build` para una imagen simple antes de desplegar Flask, y definir el Compose AWS exclusivo con PostgreSQL RDS y secretos bajo mínimos permisos. La aplicación y el catálogo en RDS siguen pendientes. La IP pública EC2 no proporciona HTTPS ni habilita el login.
+
+## Paso 19 — Buildx validado en EC2 (confirmado)
+
+El comando remoto de Systems Manager finalizó `Success`, código `0`, y devolvió `/tmp/cinegraph-buildx: OK` para el SHA-256 del binario oficial. El plugin activo es `github.com/docker/buildx v0.29.1`, el builder `default` figura `running` con BuildKit `v0.12.6-m.3` y plataforma `linux/amd64`. Docker Compose sigue en `v5.6.0` y Docker Engine está `active`. El indicador de descarga de `curl` aparece en stderr, pero no constituye error.
+
+**No se ha construido todavía una imagen ni arrancado CineGraph.**
+
+## Paso 20 — Clonar código en EC2 y construir imagen Flask (siguiente)
+
+Este paso construye una imagen local de contenedor usando exactamente el `infrastructure/docker/app.Dockerfile` existente y las dependencias del repositorio. **No ejecuta Flask como servicio, no abre puertos, no inicia PostgreSQL en Docker, no aplica migraciones, no obtiene contraseñas y no interviene Floci ni la Mac local.** La fuente se clona únicamente en `/opt/cinegraph/source` dentro de EC2. Si el directorio ya está bajo Git, se actualiza mediante fast-forward; si existe sin ser un repositorio, el paso se detiene sin sobrescribirlo.
+
+Se aprovecha que `Momos20/proyecto-integrador-equipo4` es un repositorio público. **No utilizar tokens ni claves de GitHub en el servidor**. La imagen Docker se etiqueta `cinegraph-e4-app:main` y se inspecciona tras construirla. No equivale a un despliegue funcional.
+
+**Desde AWS CloudShell:**
+
+```bash
+cd ~/cinegraph-aws
+git pull --ff-only origin main
+unset AWS_PROFILE
+export AWS_REGION=us-east-1
+
+WEB_INSTANCE_ID="$(aws cloudformation describe-stacks \
+  --stack-name cinegraph-e4-web \
+  --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue | [0]" \
+  --output text)"
+
+PARAMS="$(python3 - <<'PY'
+import json
+commands = [
+    "set -euo pipefail",
+    "REPO_DIR=/opt/cinegraph/source",
+    "if [ -d \"$REPO_DIR/.git\" ]; then git -C \"$REPO_DIR\" pull --ff-only origin main; elif [ ! -e \"$REPO_DIR\" ]; then git clone --depth 1 --branch main https://github.com/Momos20/proyecto-integrador-equipo4.git \"$REPO_DIR\"; else echo REPO_DIR_NO_ES_GIT; exit 2; fi",
+    "git -C \"$REPO_DIR\" rev-parse --short=12 HEAD",
+    "docker buildx build --load --progress plain --tag cinegraph-e4-app:main --file \"$REPO_DIR/infrastructure/docker/app.Dockerfile\" \"$REPO_DIR\" > /var/log/cinegraph-build.log 2>&1 || { tail -n 60 /var/log/cinegraph-build.log; exit 1; }",
+    "echo BUILD_IMAGE_OK",
+    "docker image inspect cinegraph-e4-app:main --format 'Imagen={{.RepoTags}} Arquitectura={{.Architecture}} SizeBytes={{.Size}}'",
+    "docker run --rm --network none --entrypoint python cinegraph-e4-app:main -c \"from app.main import app; assert '/health' in [r.rule for r in app.url_map.iter_rules()]; print('FLASK_IMPORT_OK')\"",
+]
+print(json.dumps({"commands": commands}))
+PY
+)"
+
+COMMAND_ID="$(aws ssm send-command \
+  --instance-ids "$WEB_INSTANCE_ID" \
+  --document-name AWS-RunShellScript \
+  --comment 'CineGraph: clonar y construir imagen Flask sin publicarla' \
+  --parameters "$PARAMS" \
+  --query 'Command.CommandId' --output text)"
+
+echo "CommandId: $COMMAND_ID"
+aws ssm wait command-executed \
+  --command-id "$COMMAND_ID" --instance-id "$WEB_INSTANCE_ID"
+
+aws ssm get-command-invocation \
+  --command-id "$COMMAND_ID" --instance-id "$WEB_INSTANCE_ID" \
+  --query '{Estado:Status,Codigo:ResponseCode,Salida:StandardOutputContent,Error:StandardErrorContent}' \
+  --output json
+```
+
+Se espera `Success`, código `0`, `BUILD_IMAGE_OK`, metadatos de la imagen y `FLASK_IMPORT_OK`. El smoke test usa `--network none` y un contenedor efímero; **no se conecta a PostgreSQL** ni levanta un puerto. La salida normal de la construcción queda en `/var/log/cinegraph-build.log` dentro de EC2. Si algo falla, se imprime únicamente la cola de ese log para diagnóstico; no reintentar antes de revisar el error. Si falla `wait`, consultar `get-command-invocation` con el mismo ID.
+
+Posteriormente se preparará el esquema de RDS y un usuario de aplicación de mínimo privilegio, con gestión de credenciales fuera del repositorio. El Compose AWS se diseñará sin contenedor `db` y con Flask escuchando en loopback hasta contar con un proxy HTTPS verificable. No habilitar login público por HTTP.
 
 ## Próximas fases
 
