@@ -43,7 +43,9 @@ Los nombres S3 deben ser globalmente únicos. Si hay colisión, el despliegue fa
 | 19 | Actualizar Docker Buildx para Compose | **Completo**: Buildx v0.29.1, plugin verificado, BuildKit operativo |
 | 20 | Clonar fuente y construir imagen Flask en EC2 | **Completo**: SHA de Git, BUILD_IMAGE_OK, FLASK_IMPORT_OK, código SSM 0 |
 | 21 | Verificar lectura segura del secreto y catálogo MovieLens | **Completo**: SSM Success, SECRET_ACCESS_OK, SQL_FILES_OK y MOVIELENS_MD5_OK |
-| 22 | Validar conexión TLS y estado de esquema RDS | **Siguiente**: bootstrap --plan, solo lectura; importar después de validación |
+| 22 | Validar conexión TLS y estado de esquema RDS | **Completo**: SOURCE_OK, TLS verify-full, PLAN_OK, sin tablas ni escrituras |
+| 23 | Aplicar esquema e importar catálogo MovieLens a RDS | **Siguiente**: --apply transaccional, confirmar 87585 películas |
+
 
 
 
@@ -1003,6 +1005,106 @@ aws ssm get-command-invocation \
 **Resultado esperado:** `SOURCE_OK`, `RDS_CONNECTION_OK: PostgreSQL 16, TLS verify-full`, `PLAN_OK: sin escrituras a RDS` y recuentos de esquema. Si RDS no tiene tablas, `SCHEMA_MOVIES_EXISTS=False` y `RDS_MOVIES_CURRENT=0` son normales.
 
 **No ejecutar `--apply` aún.** Revisar el plan y, si es correcto, realizar la carga de manera controlada y transaccional. La operación de importación no borra registros, no genera rankings y no ejecuta el bootstrap local que imprime contraseñas. Las futuras cuentas de login serán independientes del usuario maestro de RDS.
+
+## Paso 22 — Conexión autenticada y plan RDS validados (resultado real)
+
+Ejecución por SSM del `03-bootstrap-rds.py --plan` **sin escrituras a la base**. Se obtuvo `Status=Success`, `ResponseCode=0`, sin `Error`, con esta salida confirmada:
+
+```text
+SOURCE_OK: md5=0df90835c19151f9d819d0822e190797, movies=87585
+RDS_CONNECTION_OK: PostgreSQL 16, TLS verify-full
+PLAN_OK: sin escrituras a RDS
+SCHEMA_MOVIES_EXISTS=False
+RDS_MOVIES_CURRENT=0
+CATALOG_REGISTRY_ROWS=0
+TARGET_IMPORT_ROWS=87585
+```
+
+Se confirmó el acceso privado desde EC2 a `cinegraph-e4-postgres`, el acceso al secreto exclusivamente en memoria del proceso Python y la integridad de los datos fuente. Es una **base vacía**, por lo tanto corresponde crear el esquema y cargar el catálogo.
+
+## Paso 23 — Aplicar tablas, migraciones y catálogo a RDS (siguiente)
+
+El modo `--apply` del script `infrastructure/aws/scripts/03-bootstrap-rds.py` requiere explícitamente `CONFIRM_RDS_IMPORT=YES` dentro del contenedor. Aplica los archivos `001_init.sql`, `002_views.sql`, `003_user_interactions.sql`, `004_cinegraph_accounts_catalog.sql`, `005_watchlist_remove.sql`, y hace `COPY` transaccional de las 87.585 películas desde MovieLens 32M con checksum MD5 verificado. Comprueba recuento final y marca de integridad `catalog_imports` antes del `COMMIT`.
+
+Es una **operación con escrituras sobre RDS real**, no una simulación. Al fallar una instrucción, se revierte la transacción. No ejecuta `bootstrap.py` local, no genera usuarios de login, no elimina registros y no fabrica recomendaciones A9. Por seguridad la contraseña maestra se obtiene de Secrets Manager **solo en memoria del contenedor efímero**, sin imprimirse ni guardarse en GitHub o CloudShell. El script detiene la importación si la cantidad de registros finales no coincide con las 87.585 películas esperadas.
+
+**Comandos desde CloudShell para iniciar la importación:**
+
+```bash
+cd ~/cinegraph-aws
+git pull --ff-only origin main
+unset AWS_PROFILE
+export AWS_REGION=us-east-1
+
+WEB_INSTANCE_ID="$(aws cloudformation describe-stacks \
+  --stack-name cinegraph-e4-web \
+  --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue | [0]" \
+  --output text)"
+RDS_ENDPOINT="$(aws cloudformation describe-stacks \
+  --stack-name cinegraph-e4-postgres \
+  --query "Stacks[0].Outputs[?OutputKey=='DatabaseEndpoint'].OutputValue | [0]" \
+  --output text)"
+RDS_SECRET_ARN="$(aws rds describe-db-instances \
+  --db-instance-identifier cinegraph-e4-postgres \
+  --query 'DBInstances[0].MasterUserSecret.SecretArn' \
+  --output text)"
+
+test -n "$RDS_SECRET_ARN" && test "$RDS_SECRET_ARN" != "None" || { echo "RDS_SECRET_MISSING"; exit 1; }
+
+PARAMS="$(python3 - "$AWS_REGION" "$RDS_ENDPOINT" "$RDS_SECRET_ARN" <<'PY'
+import json, shlex, sys
+region, host, secret = sys.argv[1:4]
+docker = (
+    "docker run --rm --network host --read-only "
+    "--tmpfs /tmp:rw,noexec,nosuid,nodev,size=16m "
+    "--cap-drop ALL --security-opt no-new-privileges "
+    "-e PYTHONDONTWRITEBYTECODE=1 "
+    "-e CONFIRM_RDS_IMPORT=YES "
+    "-e AWS_REGION=" + shlex.quote(region) + " "
+    "-e RDS_ENDPOINT=" + shlex.quote(host) + " "
+    "-e RDS_SECRET_ARN=" + shlex.quote(secret) + " "
+    "-v /opt/cinegraph/source:/workspace:ro "
+    "--entrypoint python cinegraph-e4-app:main "
+    "/workspace/infrastructure/aws/scripts/03-bootstrap-rds.py --apply"
+)
+print(json.dumps({"commands":[
+    "set -euo pipefail",
+    "cd /opt/cinegraph/source",
+    "git pull --ff-only origin main",
+    "docker image inspect cinegraph-e4-app:main >/dev/null",
+    docker
+]}))
+PY
+)"
+
+COMMAND_ID="$(aws ssm send-command \
+  --instance-ids "$WEB_INSTANCE_ID" \
+  --document-name AWS-RunShellScript \
+  --comment 'CineGraph: importar esquema y 87585 películas reales a RDS' \
+  --parameters "$PARAMS" \
+  --query 'Command.CommandId' --output text)"
+
+echo "CommandId: $COMMAND_ID"
+aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$WEB_INSTANCE_ID"
+aws ssm get-command-invocation \
+  --command-id "$COMMAND_ID" --instance-id "$WEB_INSTANCE_ID" \
+  --query '{Estado:Status,Codigo:ResponseCode,Salida:StandardOutputContent,Error:StandardErrorContent}' \
+  --output json
+```
+
+**Resultados esperados:**
+
+```text
+SOURCE_OK: md5=0df90835c19151f9d819d0822e190797, movies=87585
+RDS_CONNECTION_OK: PostgreSQL 16, TLS verify-full
+SCHEMA_SQL_APPLIED
+RDS_APPLY_OK: esquema y 87585 peliculas verificadas, transaccion confirmada al salir
+RDS_COMMIT_OK: 87585 peliculas; sin cuentas ficticias ni predicciones artificiales
+```
+
+Si `aws ssm wait` termina por timeout o indica fallo, consultar el `get-command-invocation` con el **mismo** `COMMAND_ID`, sin ejecutar otro `send-command` de inmediato. La importación puede durar más que una consulta de lectura; no confundir espera con error y no lanzar duplicados.
+
+**Después:** verificar otra vez el estado mediante `--plan` (deberá indicar `SCHEMA_MOVIES_EXISTS=True`, `RDS_MOVIES_CURRENT=87585`, `CATALOG_REGISTRY_ROWS=87585`). A continuación preparar usuario SQL para Flask con privilegios mínimos, contenedor AWS único sin PostgreSQL local y acceso HTTPS para el sitio web.
 
 ## Próximas fases
 
