@@ -46,7 +46,8 @@ Los nombres S3 deben ser globalmente únicos. Si hay colisión, el despliegue fa
 | 22 | Validar conexión TLS y estado de esquema RDS | **Completo**: SOURCE_OK, TLS verify-full, PLAN_OK, sin tablas ni escrituras |
 | 23 | Aplicar esquema e importar catálogo MovieLens a RDS | **Completo**: SQL aplicado, 87585 películas, transacción confirmada (RDS_COMMIT_OK) |
 | 24 | Verificar lectura post-importación | **Completo**: SCHEMA_MOVIES_EXISTS=True, 87585 filas y registro válido |
-| 25 | Auditar preparación de usuario SQL y cuentas demo | **Siguiente**: preflight solo lectura en RDS y metadatos de Secrets Manager |
+| 25 | Auditar preparación de usuario SQL y cuentas demo | **Completo**: ningún secreto ni cuenta existente, esquema verificado |
+| 26 | Crear identidad SQL y cuentas demo segregadas | **Siguiente**: secretsmanager y transacción SQL, sin imprimir contraseñas |
 
 
 
@@ -1264,6 +1265,93 @@ aws ssm get-command-invocation \
 En una base recién inicializada es normal observar `APP_ROLE_EXISTS=False`, `APP_DB_SECRET_EXISTS=False`, `DEMO_USERS_SECRET_EXISTS=False` y `DEMO_ACCOUNTS_PRESENT=none`. El resultado correcto debe incluir también `RDS_CONNECTION_OK`, `CATALOG_READY: 87585`, `RDS_AUDIT_READ_ONLY_OK`, estado `Success`, código `0`.
 
 **Siguiente:** configurar `cinegraph_app` con `SELECT` únicamente para tablas consultadas por la app y `INSERT` exclusivamente para `user_interactions`. Las credenciales deben generarse de forma aleatoria y persistirse en Secrets Manager sin aparecer en `SSM Output`, shell ni commits. Los perfiles `cine414/cine123/cine456` serán identidades ficticias de prueba asociadas a MovieLens 414/123/456, no a personas reales. El sitio seguirá sin login público hasta disponer de HTTPS verificable.
+
+## Paso 25 — Auditoría de roles y secretos completada
+
+SSM `Status=Success`, código `0`, devolvió la evidencia real:
+
+```text
+APP_DB_SECRET_EXISTS=False
+DEMO_USERS_SECRET_EXISTS=False
+RDS_CONNECTION_OK: PostgreSQL 16, TLS verify-full
+CATALOG_READY: 87585
+APP_ROLE_EXISTS=False
+APP_ROLE_CAN_LOGIN=False
+DEMO_ACCOUNTS_PRESENT=none
+RDS_AUDIT_READ_ONLY_OK
+```
+
+Por tanto no hay credenciales de aplicación previas que preservar: RDS contiene el catálogo real, pero todavía no el rol SQL de Flask ni identidades de prueba.
+
+## Paso 26 — Crear rol de mínimo privilegio y cuentas demo en AWS (siguiente)
+
+Script nuevo `infrastructure/aws/scripts/05-provision-app-identities.py`. Su ejecución genera en memoria una contraseña aleatoria para `cinegraph_app` y tres contraseñas independientes para los perfiles ficticios `cine414` (MovieLens 414), `cine123` (123) y `cine456` (456). Las almacena **únicamente en AWS Secrets Manager** bajo los nombres `cinegraph-e4-app-db` y `cinegraph-e4-demo-users`. En `app_users` persisten **solo hashes de contraseña**, mediante Werkzeug. No se publican en CloudShell, SSM, git, compose ni la salida del script.
+
+El rol `cinegraph_app` tiene `CONNECT` a base `cinegraph`, `USAGE` en esquema `public`, `SELECT` sobre `movies`, `catalog_imports`, `app_users`, `model_versions`, `scoring_runs`, `recommendations` y `user_interactions`; y `INSERT` sobre `user_interactions` con `USAGE` de su secuencia. No es administrador ni puede editar el catálogo. La creación del rol SQL y las cuentas se ejecuta dentro de una transacción PostgreSQL y verifica después el login con TLS `verify-full` usando la contraseña leída del secreto.
+
+**Importante:** las escrituras entre Secrets Manager y RDS no son atómicas entre servicios. El script **crea los secretos antes de modificar la base**; si hay un error de permisos al crear secretos, la base queda intacta. Si posteriormente falla SQL, pueden quedar secretos creados sin rol, pero el script reutiliza secretos existentes en reintentos y **no cambia contraseñas automáticamente**. Requiere permiso `secretsmanager:CreateSecret` en el rol `LabRole`, aún no confirmado. Secrets Manager puede consumir créditos del laboratorio. No iniciar Flask todavía.
+
+**Ejecutar desde AWS CloudShell:**
+
+```bash
+cd ~/cinegraph-aws
+git pull --ff-only origin main
+unset AWS_PROFILE
+export AWS_REGION=us-east-1
+
+WEB_INSTANCE_ID=i-0e3288445cb0df13d
+RDS_ENDPOINT="$(aws cloudformation describe-stacks \
+  --stack-name cinegraph-e4-postgres \
+  --query "Stacks[0].Outputs[?OutputKey=='DatabaseEndpoint'].OutputValue | [0]" \
+  --output text)"
+RDS_SECRET_ARN="$(aws rds describe-db-instances \
+  --db-instance-identifier cinegraph-e4-postgres \
+  --query 'DBInstances[0].MasterUserSecret.SecretArn' \
+  --output text)"
+
+PARAMS="$(python3 - "$AWS_REGION" "$RDS_ENDPOINT" "$RDS_SECRET_ARN" <<'PY'
+import json, shlex, sys
+region, host, secret = sys.argv[1:4]
+docker=(
+    "docker run --rm --network host --read-only "
+    "--tmpfs /tmp:rw,noexec,nosuid,nodev,size=16m "
+    "--cap-drop ALL --security-opt no-new-privileges "
+    "-e PYTHONDONTWRITEBYTECODE=1 "
+    "-e CONFIRM_APP_CREDENTIALS=YES "
+    "-e AWS_REGION=" + shlex.quote(region) + " "
+    "-e RDS_ENDPOINT=" + shlex.quote(host) + " "
+    "-e RDS_SECRET_ARN=" + shlex.quote(secret) + " "
+    "-v /opt/cinegraph/source:/workspace:ro "
+    "--entrypoint python cinegraph-e4-app:main "
+    "/workspace/infrastructure/aws/scripts/05-provision-app-identities.py --apply"
+)
+print(json.dumps({"commands":[
+    "set -euo pipefail",
+    "cd /opt/cinegraph/source",
+    "git pull --ff-only origin main",
+    docker
+]}))
+PY
+)"
+
+COMMAND_ID="$(aws ssm send-command \
+  --instance-ids "$WEB_INSTANCE_ID" \
+  --document-name AWS-RunShellScript \
+  --comment 'CineGraph - crear app SQL y cuentas demo con secretos (sin output sensible)' \
+  --parameters "$PARAMS" \
+  --query 'Command.CommandId' --output text)"
+
+echo "CommandId: $COMMAND_ID"
+aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$WEB_INSTANCE_ID"
+aws ssm get-command-invocation \
+  --command-id "$COMMAND_ID" --instance-id "$WEB_INSTANCE_ID" \
+  --query '{Estado:Status,Codigo:ResponseCode,Salida:StandardOutputContent,Error:StandardErrorContent}' \
+  --output json
+```
+
+**Esperado:** `Success` y `Codigo=0` con `RDS_SQL_COMMIT_OK`, `APP_SQL_LOGIN_OK` y `AWS_APP_IDENTITIES_READY`. **Si falla**, consultar el mismo `COMMAND_ID` (no volver a generar secretos inmediatamente), evaluar el `stage` y `code` del error; no mostrar passwords ni intentar crear rol con claves hardcodeadas.
+
+No son perfiles humanos de MovieLens ni datos reales de los evaluadores. Para recuperar credenciales de demostración cuando el sitio HTTPS esté disponible, usar el acceso autorizado a Secrets Manager, sin copiarlas a la bitácora ni compartirlas en texto claro por el chat.
 
 ## Próximas fases
 
