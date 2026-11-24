@@ -45,7 +45,8 @@ Los nombres S3 deben ser globalmente únicos. Si hay colisión, el despliegue fa
 | 21 | Verificar lectura segura del secreto y catálogo MovieLens | **Completo**: SSM Success, SECRET_ACCESS_OK, SQL_FILES_OK y MOVIELENS_MD5_OK |
 | 22 | Validar conexión TLS y estado de esquema RDS | **Completo**: SOURCE_OK, TLS verify-full, PLAN_OK, sin tablas ni escrituras |
 | 23 | Aplicar esquema e importar catálogo MovieLens a RDS | **Completo**: SQL aplicado, 87585 películas, transacción confirmada (RDS_COMMIT_OK) |
-| 24 | Verificar lectura post-importación | **Siguiente**: --plan sobre RDS, tablas y 87585 filas registradas |
+| 24 | Verificar lectura post-importación | **Completo**: SCHEMA_MOVIES_EXISTS=True, 87585 filas y registro válido |
+| 25 | Auditar preparación de usuario SQL y cuentas demo | **Siguiente**: preflight solo lectura en RDS y metadatos de Secrets Manager |
 
 
 
@@ -1179,6 +1180,90 @@ aws ssm get-command-invocation \
 **Salida esperada:** `Status=Success`, `ResponseCode=0`, `PLAN_OK: sin escrituras a RDS`, `SCHEMA_MOVIES_EXISTS=True`, `RDS_MOVIES_CURRENT=87585`, `CATALOG_REGISTRY_ROWS=87585`, `TARGET_IMPORT_ROWS=87585`.
 
 Después de validarlo, preparar un rol SQL **de mínimos privilegios** y usuarios de login ficticios separados del usuario maestro. El contenedor Flask de producción no debe conectarse usando `cinegraphadmin`.
+
+## Paso 24 — Verificación de persistencia confirmada
+
+SSM devolvió `Status=Success`, `ResponseCode=0` y `Error=""` al ejecutar `03-bootstrap-rds.py --plan` **después** de la importación. Salida real:
+
+```text
+SOURCE_OK: md5=0df90835c19151f9d819d0822e190797, movies=87585
+RDS_CONNECTION_OK: PostgreSQL 16, TLS verify-full
+PLAN_OK: sin escrituras a RDS
+SCHEMA_MOVIES_EXISTS=True
+RDS_MOVIES_CURRENT=87585
+CATALOG_REGISTRY_ROWS=87585
+TARGET_IMPORT_ROWS=87585
+```
+
+El catálogo está íntegro y persistido: 87.585 películas con su marca de origen. Esquema y tablas creadas; las credenciales y las cuentas demo siguen pendientes.
+
+## Paso 25 — Diagnóstico de roles SQL y secretos de aplicación (solo lectura)
+
+Antes de crear cuentas, `infrastructure/aws/scripts/04-app-rds-preflight.py` verifica **sin escrituras** si existen el rol SQL `cinegraph_app`, las cuentas ficticias `cine414`, `cine123` y `cine456`, y los metadatos (nunca valores) de los futuros secretos `cinegraph-e4-app-db` y `cinegraph-e4-demo-users`.
+
+Usa la conexión PostgreSQL 16 con TLS `verify-full` ya comprobada y el secreto maestro de RDS **solo en memoria**; ejecuta `SET TRANSACTION READ ONLY`. La prueba no crea recursos ni passwords. **Un DescribeSecret satisfactorio no implica tener permiso CreateSecret; ese permiso se comprobará cuando proceda crear las credenciales.** El objetivo es evitar duplicar roles o secretos ya existentes.
+
+**Desde CloudShell:**
+
+```bash
+cd ~/cinegraph-aws
+git pull --ff-only origin main
+unset AWS_PROFILE
+export AWS_REGION=us-east-1
+
+WEB_INSTANCE_ID=i-0e3288445cb0df13d
+RDS_ENDPOINT="$(aws cloudformation describe-stacks \
+  --stack-name cinegraph-e4-postgres \
+  --query "Stacks[0].Outputs[?OutputKey=='DatabaseEndpoint'].OutputValue | [0]" \
+  --output text)"
+RDS_SECRET_ARN="$(aws rds describe-db-instances \
+  --db-instance-identifier cinegraph-e4-postgres \
+  --query 'DBInstances[0].MasterUserSecret.SecretArn' \
+  --output text)"
+
+PARAMS="$(python3 - "$AWS_REGION" "$RDS_ENDPOINT" "$RDS_SECRET_ARN" <<'PY'
+import json, shlex, sys
+region, host, secret = sys.argv[1:4]
+command=(
+    "docker run --rm --network host --read-only "
+    "--tmpfs /tmp:rw,noexec,nosuid,nodev,size=16m "
+    "--cap-drop ALL --security-opt no-new-privileges "
+    "-e PYTHONDONTWRITEBYTECODE=1 "
+    "-e AWS_REGION=" + shlex.quote(region) + " "
+    "-e RDS_ENDPOINT=" + shlex.quote(host) + " "
+    "-e RDS_SECRET_ARN=" + shlex.quote(secret) + " "
+    "-v /opt/cinegraph/source:/workspace:ro "
+    "--entrypoint python cinegraph-e4-app:main "
+    "/workspace/infrastructure/aws/scripts/04-app-rds-preflight.py"
+)
+print(json.dumps({"commands":[
+    "set -euo pipefail",
+    "cd /opt/cinegraph/source",
+    "git pull --ff-only origin main",
+    command
+]}))
+PY
+)"
+
+COMMAND_ID="$(aws ssm send-command \
+  --instance-ids "$WEB_INSTANCE_ID" \
+  --document-name AWS-RunShellScript \
+  --comment 'CineGraph - auditar rol SQL y metadatos Secrets Manager read-only' \
+  --parameters "$PARAMS" \
+  --query 'Command.CommandId' --output text)"
+
+echo "CommandId: $COMMAND_ID"
+aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$WEB_INSTANCE_ID"
+
+aws ssm get-command-invocation \
+  --command-id "$COMMAND_ID" --instance-id "$WEB_INSTANCE_ID" \
+  --query '{Estado:Status,Codigo:ResponseCode,Salida:StandardOutputContent,Error:StandardErrorContent}' \
+  --output json
+```
+
+En una base recién inicializada es normal observar `APP_ROLE_EXISTS=False`, `APP_DB_SECRET_EXISTS=False`, `DEMO_USERS_SECRET_EXISTS=False` y `DEMO_ACCOUNTS_PRESENT=none`. El resultado correcto debe incluir también `RDS_CONNECTION_OK`, `CATALOG_READY: 87585`, `RDS_AUDIT_READ_ONLY_OK`, estado `Success`, código `0`.
+
+**Siguiente:** configurar `cinegraph_app` con `SELECT` únicamente para tablas consultadas por la app y `INSERT` exclusivamente para `user_interactions`. Las credenciales deben generarse de forma aleatoria y persistirse en Secrets Manager sin aparecer en `SSM Output`, shell ni commits. Los perfiles `cine414/cine123/cine456` serán identidades ficticias de prueba asociadas a MovieLens 414/123/456, no a personas reales. El sitio seguirá sin login público hasta disponer de HTTPS verificable.
 
 ## Próximas fases
 
