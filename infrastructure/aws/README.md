@@ -31,6 +31,8 @@ Los nombres S3 deben ser globalmente únicos. Si hay colisión, el despliegue fa
 | 7 | Inspección de S3 vacío y SG libres; script temporal de eliminación | **Completado**: pila antigua y bucket vacío eliminados; consulta de stacks activos sin CineGraph |
 | 8 | Crear `cinegraph-e4-foundation` | **Completo**: `CREATE_COMPLETE` (S3 privado + SG app/RDS) |
 | 9 | Desplegar red privada `cinegraph-e4-db-network` | **Completo**: `CREATE_COMPLETE`; dos subredes privadas y DB Subnet Group |
+| 10 | Verificar subredes, rutas, SG y oferta RDS | **Completo**: red privada validada; salida de oferta paginada | 
+| 11 | Consultar ofertas PostgreSQL 16/gp3 | **Siguiente**: solo lectura, antes de crear RDS |
 
 **No quedan recursos de la primera pila**, según el resultado de CloudShell que compartió el equipo. Los scripts temporales de limpieza ya no forman parte del repositorio.
 
@@ -148,7 +150,7 @@ Si CloudFormation falla o revierte el despliegue, consultar `aws cloudformation 
 | DBSubnetGroupName | `cinegraph-e4-rds-subnets` |
 | VpcId | `vpc-083d9bebc31224f94` |
 
-## Paso 10 — Verificar seguridad de red y opciones de RDS (solo lectura)
+## Paso 10 — Seguridad de red y opciones de RDS (validado)
 
 Antes de crear `cinegraph-e4-postgres` y empezar a consumir presupuesto de RDS, confirmar que la tabla de rutas de la base contiene solamente la ruta local, que las subredes no generan IPv4 pública, que RDS admite el grupo y que el puerto 5432 solo acepta desde el SG de aplicación.
 
@@ -187,6 +189,41 @@ aws rds describe-orderable-db-instance-options \
 ```
 
 **No ejecutar `rds create-db-instance` aún**. Revisar esta salida y escoger una versión de PostgreSQL realmente ofertada para `db.t3.micro`, almacenamiento y mecanismo de credenciales permitido por el Learner Lab. Plan previsto: RDS privado y Single-AZ, datos cifrados, mínimo privilegio y sin contraseñas en Git ni historial de shell. `--manage-master-user-password` utiliza AWS Secrets Manager y requiere permisos adicionales: comprobarlos antes de elegirlo.
+
+**Resultados reales comprobados en CloudShell:**
+
+| Control | Evidencia |
+|---|---|
+| Subred `subnet-0793bb5ed242a6d56` | `us-east-1a`, `172.31.96.0/24`, `MapPublicIpOnLaunch=False` |
+| Subred `subnet-0b96249ebfcb8aa5b` | `us-east-1b`, `172.31.97.0/24`, `MapPublicIpOnLaunch=False` |
+| Tabla `rtb-0b801c15c96837c89` | Ruta única `172.31.0.0/16 → local` |
+| SG RDS `sg-0199de1701183b327` | Entrada TCP 5432 exclusivamente desde SG de aplicación `sg-0ac188ee36ce97e55`; no tiene CIDR de Internet |
+| DB subnet group | `cinegraph-e4-rds-subnets`, `Complete`, ambas subredes `Active` |
+| Oferta RDS `db.t3.micro` | Consulta devolvió PostgreSQL 11 con `gp2`, `gp3`, `io1`, `io2` y cifrado disponible en sus **primeras diez filas** |
+
+`--max-items 10` truncó la oferta a los primeros diez resultados. **No deducir que solo PostgreSQL 11 está disponible.** El contenedor PostgreSQL local es versión 16, por lo cual se prefiere PostgreSQL 16 para RDS si la cuenta lo oferta.
+
+## Paso 11 — Confirmar PostgreSQL 16 antes de crear RDS (siguiente paso)
+
+Solo consulta AWS RDS; **no crea ninguna instancia ni genera costo de cómputo**:
+
+```bash
+cd ~/cinegraph-aws
+git pull --ff-only origin main
+unset AWS_PROFILE
+export AWS_REGION=us-east-1
+
+aws rds describe-orderable-db-instance-options \
+  --engine postgres \
+  --db-instance-class db.t3.micro \
+  --query "OrderableDBInstanceOptions[?starts_with(EngineVersion, '16.') && StorageType == 'gp3'].[EngineVersion,DBInstanceClass,StorageType,SupportsStorageEncryption]" \
+  --output table
+```
+
+Se omite `--max-items` para consultar toda la lista paginada. Si no devuelve versiones `16.x`, comprobar `17.x` en vez de seleccionar automáticamente PostgreSQL 11.
+
+Solo tras verificar la versión y presupuesto se preparará la creación con nombre `cinegraph-e4-postgres`, `PubliclyAccessible=false`, Single-AZ, SG RDS restringido, almacenamiento cifrado y credenciales **fuera de Git y del historial de Shell**. AWS Academy puede no autorizar todas las opciones: cualquier error de creación debe revisarse antes de reintentar.
+
 
 
 
