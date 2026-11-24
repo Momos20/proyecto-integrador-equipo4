@@ -1,174 +1,116 @@
-# CineGraph — infraestructura AWS Academy (separada del entorno local)
+# CineGraph — AWS Academy | Equipo 4
 
-**Estado real:** la pila `cinegraph-lab-foundation` ya se creó correctamente en AWS Academy: bucket S3 privado y Security Groups para EC2 y RDS, con `WebIngressMode=None`. Todavía no se han desplegado EC2, RDS ni el frontend. El entorno local con Docker + Floci se conserva sin cambios. La ruta AWS usa CloudShell, CloudFormation y recursos separados bajo `infrastructure/aws/`.
+Despliegue **100 % por comandos AWS CLI/CloudFormation en CloudShell**. Esta carpeta conserva solo plantillas operativas y el registro de pasos. La infraestructura AWS permanece **separada de Docker + Floci local**.
 
-## Fase 2: red privada de PostgreSQL — plantilla preparada, sin ejecutar
+## Convención de recursos y valores a reemplazar
 
-La pila independiente `cloudformation/02-db-network.yaml` reutiliza la VPC de `cinegraph-e4-foundation` (después del cambio de nombres) y crea **dos subredes privadas en dos AZ**, una tabla de rutas que solo contiene la ruta implícita local de la VPC y un `AWS::RDS::DBSubnetGroup`. No crea una instancia de base de datos ni EC2 y no crea NAT Gateway. El Security Group privado de RDS ya existe en la pila foundation; se reutilizará cuando despleguemos PostgreSQL.
+Se utilizan nombres `cinegraph-e4-<componente>`, sin `dev` ni sufijos aleatorios elegidos por CloudFormation.
 
-De acuerdo con el diagnóstico real de la VPC, las seis subredes actuales ocupan `172.31.0.0/20` hasta `172.31.80.0/20`. Los candidatos `172.31.96.0/24` (us-east-1a) y `172.31.97.0/24` (us-east-1b) están libres **según esa consulta**. El script comprueba nuevamente la VPC, las zonas disponibles y los solapamientos antes de permitir crear nada.
+| Variable | Valor confirmado en la cuenta del equipo | Para otra cuenta, reemplazar por |
+|---|---|---|
+| `AWS_REGION` | `us-east-1` | Región autorizada de Learner Lab |
+| `ACCOUNT_ID` | `023914826547` | `aws sts get-caller-identity --query Account --output text` |
+| `VPC_ID` | `vpc-083d9bebc31224f94` | VPC existente en esa cuenta |
+| Stack base | `cinegraph-e4-foundation` | Mantener convención salvo necesidad específica |
+| Bucket | `cinegraph-e4-datalake-023914826547-us-east-1` | Generado en el YAML con cuenta y región |
+| SG app y DB | `cinegraph-e4-app-sg` / `cinegraph-e4-rds-sg` | Se generan dentro de la VPC |
+| Stack red RDS | `cinegraph-e4-db-network` | Mantener convención |
 
-Solo validar el plan desde CloudShell:
+Los nombres S3 deben ser globalmente únicos. Si hay colisión, el despliegue fallará sin intentar borrar datos ajenos.
+
+## Bitácora de pasos completados
+
+| Paso | Acción y comandos | Resultado |
+|---|---|---|
+| 1 | `aws sts get-caller-identity` | CloudShell autenticado mediante rol `voclabs` en la cuenta indicada |
+| 2 | `aws ec2 describe-vpcs`, `describe-subnets`, `describe-route-tables`, `describe-internet-gateways` | VPC predeterminada, 6 subredes y salida a Internet confirmadas |
+| 3 | `aws iam get-instance-profile --instance-profile-name LabInstanceProfile` | `LabRole` disponible |
+| 4 | `aws ec2 describe-instance-type-offerings` y `aws rds describe-orderable-db-instance-options` | Oferta regional t3.micro/t3.small y db.t3.micro; aún no se crearon |
+| 5 | `aws cloudfront list-distributions` | `AccessDenied`. No depender de CloudFront |
+| 6 | Primera pila `cinegraph-lab-foundation` | Creada, verificada, luego eliminada por cambio de nombres |
+| 7 | Inspección de S3 vacío y SG libres; script temporal de eliminación | **Completado**: pila antigua y bucket vacío eliminados; consulta de stacks activos sin CineGraph |
+| 8 | Crear `cinegraph-e4-foundation` | **SIGUIENTE PASO** |
+| 9 | Crear red privada `cinegraph-e4-db-network` | Pendiente, ya existe plantilla y script |
+
+**No quedan recursos de la primera pila**, según el resultado de CloudShell que compartió el equipo. Los scripts temporales de limpieza ya no forman parte del repositorio.
+
+## Paso 8 — Foundation definitiva (comandos listos)
+
+**1. Actualizar y comprobar identidad.** Cambiar `AWS_REGION` y `VPC_ID` solo si se replica en otra cuenta.
 
 ```bash
 cd ~/cinegraph-aws
 git pull --ff-only origin main
 unset AWS_PROFILE
 export AWS_REGION=us-east-1
+export VPC_ID=vpc-083d9bebc31224f94
+aws sts get-caller-identity --query '[Account,Arn]' --output table
+```
+
+**2. Validar el YAML (no crea recursos):**
+
+```bash
+aws cloudformation validate-template \
+  --template-body file://infrastructure/aws/cloudformation/01-foundation.yaml
+```
+
+**3. Crear recursos AWS reales (S3 privado y 2 Security Groups sin web público):**
+
+```bash
+aws cloudformation deploy \
+  --region "$AWS_REGION" \
+  --stack-name cinegraph-e4-foundation \
+  --template-file infrastructure/aws/cloudformation/01-foundation.yaml \
+  --parameter-overrides "VpcId=$VPC_ID" \
+  --tags Project=CineGraph Team=E4 Environment=lab \
+  --no-fail-on-empty-changeset
+```
+
+**4. Confirmar `CREATE_COMPLETE` y salidas del stack:**
+
+```bash
+aws cloudformation describe-stacks \
+  --stack-name cinegraph-e4-foundation \
+  --query 'Stacks[0].{Estado:StackStatus,Recursos:Outputs}' \
+  --output json
+```
+
+**5. Confirmar bloqueo de acceso público S3:**
+
+```bash
+aws s3api get-public-access-block \
+  --bucket cinegraph-e4-datalake-023914826547-us-east-1
+```
+
+Si falla el despliegue, consultar eventos en lugar de borrar por fuerza:
+
+```bash
+aws cloudformation describe-stack-events \
+  --stack-name cinegraph-e4-foundation \
+  --query 'StackEvents[].[Timestamp,LogicalResourceId,ResourceStatus,ResourceStatusReason]' \
+  --output table
+```
+
+Tras verificar en CloudShell, actualizar esta bitácora con el estado real y los IDs que devuelva CloudFormation.
+
+## Paso 9 — Red privada de PostgreSQL (solo después del Paso 8)
+
+`cloudformation/02-db-network.yaml` crea dos subredes privadas en distintas AZ, tabla de rutas solo local (sin Internet) y DB Subnet Group; **todavía no crea una instancia RDS**.
+
+Según la red observada, se proponen `172.31.96.0/24` en `us-east-1a` y `172.31.97.0/24` en `us-east-1b`. El script verifica solapamiento y AZ disponibles.
+
+```bash
 bash infrastructure/aws/scripts/02-db-network.sh --plan
 ```
 
-El resultado esperado es `PLAN OK: 2 subredes privadas + tabla de rutas + DB Subnet Group.` **No ejecutar todavía `--apply` sin revisar la salida y aprobarla.** Si el laboratorio rechaza crear `AWS::RDS::DBSubnetGroup` por IAM, la pila puede quedar en `ROLLBACK_COMPLETE`; revisar eventos antes de reintentar.
-
-Tras aprobar y crear la pila, antes de lanzar RDS se comprobarán sus Output IDs, que las dos subredes estén en AZ distintas, `MapPublicIpOnLaunch=false`, ausencia de rutas externas y el grupo de seguridad de RDS restringido a la aplicación.
-
-## Nombres estandarizados y limpieza de la pila antigua
-
-Se utiliza el prefijo `cinegraph-e4` en todos los recursos nuevos (`e4` identifica al Equipo 4), sin el sufijo de entorno en los nombres. El nombre del bucket S3 es explícito y determinista: `cinegraph-e4-datalake-<ACCOUNT_ID>-<REGION>`, usando los pseudoparámetros `AWS::AccountId` y `AWS::Region` de CloudFormation. Aunque es muy improbable una colisión, el nombre debe estar disponible en el namespace global de S3.
-
-| Componente | Nuevo nombre |
-|---|---|
-| Foundation stack | `cinegraph-e4-foundation` |
-| Bucket S3 | `cinegraph-e4-datalake-023914826547-us-east-1` |
-| SG app | `cinegraph-e4-app-sg` |
-| SG RDS | `cinegraph-e4-rds-sg` |
-| DB network stack | `cinegraph-e4-db-network` |
-| Subnets RDS | `cinegraph-e4-rds-private-a` y `cinegraph-e4-rds-private-b` |
-
-La **pila antigua**, `cinegraph-lab-foundation`, fue creada con un bucket autogenerado `cinegraph-lab-foundation-datalakebucket-lrnkpdjo5xiv`, SG web `sg-00d7ff2cb71f16854` y SG RDS `sg-004792f0dba4268be`. **No hemos borrado ningún recurso AWS**; su borrado debe hacerse por CloudShell después de verificar que no tiene información.
-
-**Paso 1, inspección sin borrar:**
+Únicamente tras revisar el plan:
 
 ```bash
-cd ~/cinegraph-aws
-git pull --ff-only origin main
-unset AWS_PROFILE
-export AWS_REGION=us-east-1
-export EXPECTED_ACCOUNT_ID=023914826547
-bash infrastructure/aws/scripts/00-retire-legacy-foundation.sh --inspect
+CONFIRM_LAB_DEPLOY=YES bash infrastructure/aws/scripts/02-db-network.sh --apply
 ```
 
-El script verifica cuenta, región, estructura exacta de la pila, ausencia de objetos actuales y versionados en S3 y SG sin interfaces asociadas. Si hay datos, **no permite eliminar**.
+## Próximas fases
 
-**Paso 2, eliminación de recursos antiguos (solo tras revisar Paso 1):**
+RDS PostgreSQL privado; EC2 con Docker Compose **separado de Floci**, frontend/backend y catálogo; acceso público **HTTPS válido** para que el equipo pueda compartir el enlace e iniciar sesión con usuarios ficticios; Kinesis → Firehose → S3 Raw → Curated/Features, con orquestación según permisos de AWS Academy. Las guías SI7002 N0–N2 son referencias, no pasos de consola.
 
-```bash
-CONFIRM_DELETE_LEGACY_CINEGRAPH=DELETE_cinegraph-lab-foundation \
-  bash infrastructure/aws/scripts/00-retire-legacy-foundation.sh --delete
-```
-
-La política `DeletionPolicy: Retain` conserva el bucket después de eliminar la pila; el script comprueba otra vez que está vacío y después elimina exclusivamente ese bucket. Si falla alguna comprobación, detiene el proceso. No usa `--force` ni elimina objetos.
-
-**Paso 3, crear foundation nueva (solo tras comprobar eliminación):**
-
-```bash
-unset STACK_NAME
-export VPC_ID=vpc-083d9bebc31224f94
-export WEB_INGRESS_MODE=None
-bash infrastructure/aws/scripts/01-foundation.sh --plan
-CONFIRM_LAB_DEPLOY=YES bash infrastructure/aws/scripts/01-foundation.sh --apply
-```
-
-El paso 3 todavía no crea EC2, RDS ni acceso público. El resto del despliegue continúa con `02-db-network.sh`, que ahora referencia `cinegraph-e4-foundation` y `cinegraph-e4-db-network`.
-
-## Ruta CLI del equipo: EC2 público, RDS privado (alternativa a CloudFront)
-
-Esta ruta sigue **como referencia**, no como receta manual, el laboratorio N0 de SI7002: EC2 para frontend/backend, RDS PostgreSQL como OLTP y VPC/SG. Los siguientes hitos se basan en N1 (S3, streaming, Kinesis/Firehose) y N2 (Curated, Features y Step Functions). **Todos los pasos se harán desde CloudShell con AWS CLI/CloudFormation y validación de resultados**. No se requiere abrir manualmente la consola de servicios; sí iniciar la sesión del Learner Lab y CloudShell.
-
-Situación: `cloudfront:ListDistributions` devolvió `AccessDenied`. Ese permiso de lectura denegado **no demuestra** por sí solo que la creación esté prohibida, pero no basaremos el primer entregable en ese servicio. La ruta de respaldo es una **EC2 accesible públicamente mediante una URL compartible**, con RDS no público. El acceso de usuarios debe protegerse con **HTTPS** antes de activar el inicio de sesión por Internet. Se evaluará un nombre DNS accesible y un certificado TLS válido para un proxy inverso en la EC2; sin dominio/certificado no declarar HTTPS operativo. La guía N0 usa HTTP/Elastic IP únicamente para laboratorio; no es adecuado para contraseñas reales. Usar exclusivamente usuarios ficticios.
-
-Secuencia de implementación sin intervención manual sobre recursos:
-
-0. **Preflight de red, tamaños y permisos de lectura**: `00-check-ec2-rds.sh`. No crea recursos.
-1. **Fundación**: CloudFormation `01-foundation.yaml` con `WEB_INGRESS_MODE=None` por defecto. Crea S3 privado y SG para EC2/RDS, inicialmente sin apertura web.
-2. **Red**: declarar mediante CloudFormation dos subredes privadas en distintas AZ (sin NAT Gateway) que no solapen CIDRs de la VPC actual; una subred pública existente para EC2. Verificar rutas/IGW y permisos.
-3. **Compute y OLTP**: EC2 con `LabInstanceProfile` y un `compose` específico AWS; RDS PostgreSQL privada, DB subnet group, esquema y catálogo importados con herramienta separada del bootstrap local.
-4. **Compartir el frontend**: publicar HTTPS en 443 con un proxy inverso y certificado validado; mantener el puerto interno 8000 inaccesible desde Internet. Compartir enlace solo después de probar salud, login, logout y recomendaciones.
-5. **MLOps**: Kinesis/Firehose hacia S3 Raw, Curated/Features y posteriores servicios que el laboratorio permita.
-
-**Siguiente comando (solo lectura):**
-
-```bash
-cd ~/cinegraph-aws
-git pull --ff-only origin main
-unset AWS_PROFILE
-export AWS_REGION=us-east-1
-export VPC_ID=vpc-083d9bebc31224f94
-bash infrastructure/aws/scripts/00-check-ec2-rds.sh
-```
-
-Validar su salida antes de iniciar cualquier `--apply` o crear recursos. El entorno Docker + Floci local no se modifica.
-
-## Objetivo: enlace compartible por todo el equipo
-
-CineGraph NO debe quedar ligado a la IP del estudiante: tus compañeros deben entrar desde sus computadores a una URL HTTPS pública, iniciar sesión y consultar el catálogo/GraphSAGE A9.
-
-Diseño previsto (sujeto a permisos de AWS Academy):
-
-```text
-Navegadores del equipo
-       | HTTPS (dominio *.cloudfront.net)
-       v
-  Amazon CloudFront  (sin cache de sesiones/API)
-       | HTTP 8000 solo hasta origen EC2 (*)
-       v
-EC2 publica + CineGraph Flask/Gunicorn  --- RDS PostgreSQL privada
-       |                                        ^
-       | clickstream                            |
-       v                                        |
-Kinesis -> Firehose -> S3 privado           Top-K A9
-```
-
-(*) La sesión del navegador viaja cifrada hasta CloudFront, pero la conexión CloudFront→EC2 sería HTTP en este primer laboratorio. **No es seguridad de producción ni HTTPS extremo a extremo**; utilizaremos solo cuentas ficticias de demostración, nada personal/sensible. Una arquitectura final deberá cifrar también el tramo de origen o usar ALB/ACM y HTTPS hacia EC2.
-
-CloudFront proporciona un dominio `https://d....cloudfront.net`, sin necesidad de registrar dominio propio, si la cuenta permite crear distribuciones. En EC2, el puerto 8000 estará abierto **solo al prefijo AWS administrado de IP de origen CloudFront**, no a todo Internet. RDS no recibe conexiones públicas. Si la cuenta no permite CloudFront, diseñaremos otro acceso HTTPS antes de abrir credenciales en la red.
-
-## Diagnósticos ejecutados antes de crear la pila inicial
-
-Ya se comprobó que las credenciales de CloudShell funcionan, `us-east-1` es la región, existe la VPC `vpc-083d9bebc31224f94` y tiene seis subredes, está disponible `LabInstanceProfile / LabRole`, RDS permite consulta y CloudFormation valida la plantilla.
-
-En CloudShell:
-
-```bash
-cd ~/cinegraph-aws
-git pull --ff-only origin main
-unset AWS_PROFILE
-export AWS_REGION=us-east-1
-bash infrastructure/aws/scripts/00-check-sharing.sh
-```
-
-Este script comprueba, **sin crear recursos**, si la cuenta permite leer CloudFront y el prefijo de red necesario. No prueba todavía permisos de creación. **Esperar validación antes de continuar.**
-
-## Fundación CloudFormation — usar la nueva nomenclatura
-
-Archivo: `cloudformation/01-foundation.yaml`. Crea solamente S3 privado/cifrado y dos Security Groups. **Sin EC2, RDS, CloudFront ni Glue en esta fase.** Reutiliza la VPC existente.
-
-Modos de acceso para el puerto web EC2 (se elige por `WEB_INGRESS_MODE`):
-
-- `None` (predeterminado): sin acceso entrante desde redes externas. Seguro mientras se prepara la infraestructura.
-- `CloudFront` (plan de sitio compartido): permite 8000 **solo desde el prefijo administrado `com.amazonaws.global.cloudfront.origin-facing`**. No exige IP individual de tus compañeros.
-- `RestrictedIP` (diagnóstico opcional): permite 8000 desde una única IPv4 pública `/32`; no se usa para el demo del equipo.
-
-```bash
-export VPC_ID=vpc-083d9bebc31224f94
-export WEB_INGRESS_MODE=None
-bash infrastructure/aws/scripts/01-foundation.sh --plan
-```
-
-`--plan` no crea recursos y valida la plantilla. CloudFront devolvió AccessDenied al consultar distribuciones; la estrategia principal ahora es EC2 con una URL compartible y un HTTPS válido para el inicio de sesión. La apertura de red permanece cerrada hasta esa fase. **`--apply` requiere `CONFIRM_LAB_DEPLOY=YES` y solo debe ejecutarse tras comprobar permisos, costos y recursos**.
-
-## Secuencia posterior
-
-1. Fundación de S3 y SG en CloudFormation.
-2. EC2 con Docker Compose **específico para AWS**, sin `db` local ni Floci.
-3. RDS PostgreSQL no pública, esquema y importación de MovieLens y Top-K históricos verificados; no utilizar sin cambios `local_setup`, que bloquea destinos no locales.
-4. Distribución CloudFront HTTPS configurada **sin cachear sesiones, cookies ni APIs**, con métodos POST para login/interacciones y dominio público para compartir al equipo.
-5. Kinesis Streams → Firehose → S3 Raw, transformación, observabilidad y MLOps según permisos de laboratorio.
-
-**Seguridad y limpieza:** nunca guardar access keys, contraseñas o cookies en GitHub; no eliminar volúmenes locales; no crear NAT Gateway ni abrir PostgreSQL a Internet; no abrir HTTP 8000 a `0.0.0.0/0` para transportar credenciales; controlar presupuesto y borrar recursos de lab cuando termine la demostración.
-
-Comprobación offline de las plantillas:
-
-```bash
-python3 -m unittest tests/test_aws_academy_scaffold.py -v
-```
+**Seguridad:** no abrir RDS a Internet, no exponer el login por HTTP, no guardar secretos en Git, no ejecutar `docker compose down -v` sobre el entorno local.
