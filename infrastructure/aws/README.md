@@ -4,7 +4,7 @@
 
 ## Fase 2: red privada de PostgreSQL — plantilla preparada, sin ejecutar
 
-La pila independiente `cloudformation/02-db-network.yaml` reutiliza la VPC de `cinegraph-lab-foundation` y crea **dos subredes privadas en dos AZ**, una tabla de rutas que solo contiene la ruta implícita local de la VPC y un `AWS::RDS::DBSubnetGroup`. No crea una instancia de base de datos ni EC2 y no crea NAT Gateway. El Security Group privado de RDS ya existe en la pila foundation; se reutilizará cuando despleguemos PostgreSQL.
+La pila independiente `cloudformation/02-db-network.yaml` reutiliza la VPC de `cinegraph-e4-dev-foundation` (después del cambio de nombres) y crea **dos subredes privadas en dos AZ**, una tabla de rutas que solo contiene la ruta implícita local de la VPC y un `AWS::RDS::DBSubnetGroup`. No crea una instancia de base de datos ni EC2 y no crea NAT Gateway. El Security Group privado de RDS ya existe en la pila foundation; se reutilizará cuando despleguemos PostgreSQL.
 
 De acuerdo con el diagnóstico real de la VPC, las seis subredes actuales ocupan `172.31.0.0/20` hasta `172.31.80.0/20`. Los candidatos `172.31.96.0/24` (us-east-1a) y `172.31.97.0/24` (us-east-1b) están libres **según esa consulta**. El script comprueba nuevamente la VPC, las zonas disponibles y los solapamientos antes de permitir crear nada.
 
@@ -123,7 +123,7 @@ Kinesis -> Firehose -> S3 privado           Top-K A9
 
 CloudFront proporciona un dominio `https://d....cloudfront.net`, sin necesidad de registrar dominio propio, si la cuenta permite crear distribuciones. En EC2, el puerto 8000 estará abierto **solo al prefijo AWS administrado de IP de origen CloudFront**, no a todo Internet. RDS no recibe conexiones públicas. Si la cuenta no permite CloudFront, diseñaremos otro acceso HTTPS antes de abrir credenciales en la red.
 
-## Etapa actual: diagnósticos (sin recursos creados)
+## Diagnósticos ejecutados antes de crear la pila inicial
 
 Ya se comprobó que las credenciales de CloudShell funcionan, `us-east-1` es la región, existe la VPC `vpc-083d9bebc31224f94` y tiene seis subredes, está disponible `LabInstanceProfile / LabRole`, RDS permite consulta y CloudFormation valida la plantilla.
 
@@ -139,7 +139,7 @@ bash infrastructure/aws/scripts/00-check-sharing.sh
 
 Este script comprueba, **sin crear recursos**, si la cuenta permite leer CloudFront y el prefijo de red necesario. No prueba todavía permisos de creación. **Esperar validación antes de continuar.**
 
-## Fundación con CloudFormation — solo después de validar
+## Fundación CloudFormation — usar la nueva nomenclatura
 
 Archivo: `cloudformation/01-foundation.yaml`. Crea solamente S3 privado/cifrado y dos Security Groups. **Sin EC2, RDS, CloudFront ni Glue en esta fase.** Reutiliza la VPC existente.
 
@@ -151,11 +151,11 @@ Modos de acceso para el puerto web EC2 (se elige por `WEB_INGRESS_MODE`):
 
 ```bash
 export VPC_ID=vpc-083d9bebc31224f94
-export WEB_INGRESS_MODE=CloudFront
+export WEB_INGRESS_MODE=None
 bash infrastructure/aws/scripts/01-foundation.sh --plan
 ```
 
-`--plan` no crea recursos y valida la plantilla. Si CloudFront no está disponible, no ejecutes ese plan: se decidirá un método HTTPS alternativo. **`--apply` requiere `CONFIRM_LAB_DEPLOY=YES` y solo debe ejecutarse tras comprobar permisos, costos y recursos**.
+`--plan` no crea recursos y valida la plantilla. CloudFront devolvió AccessDenied al consultar distribuciones; la estrategia principal ahora es EC2 con una URL compartible y un HTTPS válido para el inicio de sesión. La apertura de red permanece cerrada hasta esa fase. **`--apply` requiere `CONFIRM_LAB_DEPLOY=YES` y solo debe ejecutarse tras comprobar permisos, costos y recursos**.
 
 ## Secuencia posterior
 
