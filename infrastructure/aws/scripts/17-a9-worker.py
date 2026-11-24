@@ -27,7 +27,9 @@ with tarfile.open(base/"a9-source.tar.gz") as t:
             raise RuntimeError("Unsafe archive")
     t.extractall(work)
 assert sha(work/"ml/models/A9_sin_id/modelo.pt")==modelhash
-run(sys.executable,"-m","pip","install","--no-cache-dir","torch==2.5.1","--index-url","https://download.pytorch.org/whl/cpu")
+run(sys.executable,"-m","pip","install","--upgrade","--no-cache-dir","pip","setuptools","wheel")
+run(sys.executable,"-m","pip","install","--no-cache-dir","--only-binary=:all:","typing-extensions==4.12.2","filelock","networkx","jinja2","fsspec","sympy==1.13.1")
+run(sys.executable,"-m","pip","install","--no-cache-dir","--no-deps","torch==2.5.1+cpu","--index-url","https://download.pytorch.org/whl/cpu")
 run(sys.executable,"-m","pip","install","--no-cache-dir","numpy==1.26.4","pandas==2.2.3","pyarrow==18.1.0","scipy==1.14.1","torch-geometric==2.6.1","matplotlib==3.9.4")
 archive=work/"ml-32m.zip"
 urllib.request.urlretrieve("https://files.grouplens.org/datasets/movielens/ml-32m.zip",archive)
