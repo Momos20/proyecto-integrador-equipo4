@@ -1,0 +1,94 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  CineGraph E4 - EC2 Amazon Linux 2023 para app Flask.
+  Fase de infraestructura: instala Docker, no publica API ni configura credenciales.
+
+Parameters:
+  WebSubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Subred PUBLICA existente, con ruta al Internet Gateway.
+  AppSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: SG de app existente sin inbound publico; obtenido del stack foundation.
+  ImageId:
+    Type: AWS::EC2::Image::Id
+    Default: ami-0aacbf72109c53c0c
+    Description: AMI AL2023 x86_64 confirmada en us-east-1; revisar en otras regiones.
+  InstanceType:
+    Type: String
+    Default: t3.small
+    AllowedValues: [t3.micro, t3.small]
+    Description: t3.small da 2 GiB de RAM para Docker + Flask.
+  InstanceProfileName:
+    Type: String
+    Default: LabInstanceProfile
+    Description: Perfil de instancia existente con LabRole; comprobar SSM antes del despliegue.
+  RootDeviceName:
+    Type: String
+    Default: /dev/xvda
+    Description: Verificar RootDeviceName con describe-images antes de desplegar.
+
+Resources:
+  WebInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref InstanceProfileName
+      EbsOptimized: true
+      Monitoring: false
+      MetadataOptions:
+        HttpEndpoint: enabled
+        HttpTokens: required
+        HttpPutResponseHopLimit: 2
+      NetworkInterfaces:
+        - DeviceIndex: '0'
+          AssociatePublicIpAddress: true
+          DeleteOnTermination: true
+          GroupSet:
+            - !Ref AppSecurityGroupId
+          SubnetId: !Ref WebSubnetId
+      BlockDeviceMappings:
+        - DeviceName: !Ref RootDeviceName
+          Ebs:
+            VolumeSize: 24
+            VolumeType: gp3
+            Encrypted: true
+            DeleteOnTermination: true
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euo pipefail
+          exec > >(tee -a /var/log/cinegraph-bootstrap.log | logger -t cinegraph-bootstrap) 2>&1
+          echo "CineGraph - inicializando Docker (sin secretos ni frontend publico)"
+          dnf install -y docker
+          systemctl enable --now docker
+          mkdir -p /opt/cinegraph /var/log/cinegraph
+          chmod 0755 /opt/cinegraph
+          docker --version
+          echo "CineGraph - bootstrap EC2 completado"
+      Tags:
+        - Key: Name
+          Value: cinegraph-e4-web
+        - Key: Project
+          Value: CineGraph
+        - Key: Team
+          Value: E4
+        - Key: Environment
+          Value: lab
+
+Outputs:
+  InstanceId:
+    Description: ID real de la instancia EC2 de CineGraph.
+    Value: !Ref WebInstance
+  PrivateIp:
+    Description: IPv4 privada para hablar con RDS dentro de la VPC.
+    Value: !GetAtt WebInstance.PrivateIp
+  PublicIp:
+    Description: IP publica efimera; no abrir login sin HTTPS.
+    Value: !GetAtt WebInstance.PublicIp
+  PublicDnsName:
+    Description: DNS publico asignado por AWS; no implica HTTPS habilitado.
+    Value: !GetAtt WebInstance.PublicDnsName
+  AppSecurityGroupId:
+    Value: !Ref AppSecurityGroupId

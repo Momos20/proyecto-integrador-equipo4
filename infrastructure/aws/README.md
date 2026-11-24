@@ -34,7 +34,8 @@ Los nombres S3 deben ser globalmente únicos. Si hay colisión, el despliegue fa
 | 10 | Verificar subredes, rutas, SG y oferta RDS | **Completo**: red privada validada; salida de oferta paginada | 
 | 11 | Consultar ofertas PostgreSQL 16/gp3 | **Completo**: 16.9–16.15, `db.t3.micro`, gp3, cifrado |
 | 12 | Crear PostgreSQL 16.15 privado | **Completo**: CloudFormation `CREATE_COMPLETE`, instancia `available` |
-| 13 | Preparar servidor de CineGraph EC2 | **Siguiente**: validaciones de acceso, subred pública y AMI; sin crear recursos |
+| 13 | Verificar preparación EC2 | **Completo**: subred pública, rutas IGW, AMI AL2023, LabInstanceProfile y SG sin ingreso; secreto RDS activo |
+| 14 | Preparar instancia `cinegraph-e4-web` | **Siguiente**: confirmar acceso SSM e imagen, validar CloudFormation antes de crear |
 
 **No quedan recursos de la primera pila**, según el resultado de CloudShell que compartió el equipo. Los scripts temporales de limpieza ya no forman parte del repositorio.
 
@@ -370,6 +371,97 @@ aws rds describe-db-instances \
 Si `ssm get-parameter` muestra `AccessDenied`, puede consultarse la AMI mediante `ec2 describe-images` (solo lectura) antes de desplegar. El siguiente paso después de validar será diseñar/crear `cinegraph-e4-web` con EC2 y acceso seguro a RDS, y preparar un Compose **AWS** sin contenedor `db` ni Floci.
 
 **Costos:** `cinegraph-e4-postgres` está activo y consume presupuesto de AWS Academy incluso sin tráfico. EC2 agregará costos de instancia/IPv4 pública; consultar el presupuesto disponible del Learner Lab antes del despliegue. No exponer 5432 al exterior ni registrar valores de Secrets Manager en CloudShell o Git.
+
+
+## Resultado real — paso 13 (EC2 preflight completado)
+
+La cuenta AWS Academy confirmó la subred pública `subnet-07413c35ec3498c14`, `us-east-1a`, `172.31.32.0/20`, `MapPublicIpOnLaunch=true`. La subred usa la tabla principal de la VPC, `rtb-029f59127c097ea81`, cuya ruta `0.0.0.0/0` apunta al IGW `igw-0328b4a604d6cd226`. La tabla RDS `rtb-0b801c15c96837c89` **solo** tiene `172.31.0.0/16 -> local`.
+
+Se verificaron `LabInstanceProfile` con rol `LabRole`, AL2023 x86_64 `ami-0aacbf72109c53c0c`, SG de app `sg-0ac188ee36ce97e55` **sin reglas entrantes**, y RDS `cinegraph-e4-postgres` con `MasterUser=cinegraphadmin`, estado de secreto `active` y `PubliclyAccessible=false`.
+
+Este preflight **no confirma** permisos de `ssm:StartSession` para el usuario de CloudShell ni los permisos de `AmazonSSMManagedInstanceCore` para el rol EC2; es imprescindible comprobarlo antes de depender de Session Manager.
+
+## Paso 14 — Preparar EC2 CineGraph sin abrir el sitio
+
+Plantilla nueva: `cloudformation/04-web-ec2.yaml`. Crea solo `cinegraph-e4-web` con AMI Amazon Linux 2023, `t3.small` (2 GiB), 24 GiB gp3 cifrado, `LabInstanceProfile`, IP pública para el tráfico saliente y **SG de app sin ninguna entrada pública**. El `UserData` instala Docker; no contiene contraseñas, no descarga el código ni inicia el frontend.
+
+Una IP pública no equivale a un sitio compartible: antes de publicar el login necesitamos un proxy HTTPS válido. Como no hay SSH abierto ni par de claves SSH, la administración prevista es AWS Systems Manager Session Manager; **se debe comprobar primero que esté disponible y tenga permisos**. SSM necesita permiso en la instancia para conectarse a servicios SSM por HTTPS y permisos del operador para iniciar la sesión.
+
+**1. Consultas antes del despliegue (solo lectura):**
+
+```bash
+cd ~/cinegraph-aws
+git pull --ff-only origin main
+unset AWS_PROFILE
+export AWS_REGION=us-east-1
+
+# Confirmar AMI de AL2023 y nombre del dispositivo EBS raiz.
+aws ec2 describe-images \
+  --image-ids ami-0aacbf72109c53c0c \
+  --query 'Images[0].{Id:ImageId,State:State,Architecture:Architecture,RootDeviceName:RootDeviceName,VirtualizationType:VirtualizationType}' \
+  --output json
+
+# Comprobar politicas administradas del rol LabRole.
+aws iam list-attached-role-policies \
+  --role-name LabRole \
+  --query 'AttachedPolicies[].[PolicyName,PolicyArn]' \
+  --output table
+
+# Verificar si CloudShell puede consultar la flota de Systems Manager.
+aws ssm describe-instance-information \
+  --max-results 5 \
+  --query 'InstanceInformationList[].[InstanceId,PingStatus,PlatformName]' \
+  --output table
+
+# Comprobar que aun no existe ninguna EC2 de CineGraph.
+aws ec2 describe-instances \
+  --filters 'Name=tag:Name,Values=cinegraph-e4-web' \
+  --query 'Reservations[].Instances[].[InstanceId,State.Name,InstanceType]' \
+  --output table
+
+# Validar plantilla sin crear recursos.
+aws cloudformation validate-template \
+  --template-body file://infrastructure/aws/cloudformation/04-web-ec2.yaml
+```
+
+Si `list-attached-role-policies` no muestra `AmazonSSMManagedInstanceCore`, también puede haber políticas inline que otorguen permisos equivalentes. Se inspeccionarán antes de lanzar EC2. Un permiso de lectura de flota no prueba que el operador pueda iniciar sesiones; esto se valida posteriormente con la instancia, sin abrir SSH.
+
+**2. Despliegue (AÚN NO EJECUTADO, incurre costos EC2/EBS/IPv4):**
+
+```bash
+export WEB_SUBNET_ID=subnet-07413c35ec3498c14
+APP_SG="$(aws cloudformation describe-stacks \
+  --stack-name cinegraph-e4-foundation \
+  --query "Stacks[0].Outputs[?OutputKey=='AppSecurityGroupId'].OutputValue | [0]" \
+  --output text)"
+
+aws cloudformation deploy \
+  --region "$AWS_REGION" \
+  --stack-name cinegraph-e4-web \
+  --template-file infrastructure/aws/cloudformation/04-web-ec2.yaml \
+  --parameter-overrides "WebSubnetId=$WEB_SUBNET_ID" "AppSecurityGroupId=$APP_SG" \
+  --tags Project=CineGraph Team=E4 Environment=lab
+```
+
+**3. Verificación tras crearla (AÚN NO EJECUTADA):**
+
+```bash
+aws cloudformation describe-stacks \
+  --stack-name cinegraph-e4-web \
+  --query 'Stacks[0].{Estado:StackStatus,Recursos:Outputs}' \
+  --output json
+```
+
+```bash
+aws ec2 describe-instances \
+  --filters 'Name=tag:Name,Values=cinegraph-e4-web' \
+  --query 'Reservations[].Instances[].[InstanceId,State.Name,PrivateIpAddress,PublicIpAddress,IamInstanceProfile.Arn]' \
+  --output table
+```
+
+No confundir `CREATE_COMPLETE` con Docker configurado: el `UserData` se ejecuta durante el arranque; se verificará con SSM o consola de EC2 según permisos. El archivo `docker-compose.yml` local contiene PostgreSQL dentro de Docker y contraseñas de ejemplo: **no se ejecutará en AWS**. Crearemos un Compose AWS exclusivo para Flask con RDS y credenciales obtenidas de forma segura, sin modificar Docker + Floci local.
+
+**Costos:** EC2 `t3.small`, EBS gp3 e IPv4 pública son cobrables. RDS está `available` y ya consume presupuesto. Detener recursos cuando no se utilicen y cerrar el laboratorio cuando termine la demostración.
 
 
 ## Próximas fases
