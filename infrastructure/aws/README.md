@@ -38,7 +38,8 @@ Los nombres S3 deben ser globalmente únicos. Si hay colisión, el despliegue fa
 | 14 | Verificar AMI, IAM/SSM y plantilla de EC2 | **Completo**: AL2023 disponible, rol con AmazonSSMManagedInstanceCore, YAML válido |
 | 15 | Crear EC2 `cinegraph-e4-web` | **Completo**: `CREATE_COMPLETE`; EC2 `running` y SSM `Online` |
 | 16 | Verificar Docker y bootstrap en EC2 | **Completo**: SSM Success, código 0, Docker activo, cloud-init done |
-| 17 | Comprobar requisitos de app y acceso EC2 → RDS | **Siguiente**: diagnóstico remoto por SSM, sin publicar servicio |
+| 17 | Comprobar requisitos de app y acceso EC2 → RDS | **Completo**: DNS y TCP 5432 correctos, faltan Git y Compose |
+| 18 | Instalar Git y Docker Compose verificado | **Siguiente**: SSM, sin abrir puertos ni desplegar la app |
 
 
 
@@ -662,6 +663,64 @@ aws ssm get-command-invocation \
 El `docker compose` puede no venir con el paquete `docker` de AL2023. En ese caso instalaremos el complemento mediante método verificable antes de desplegar la app. Si el puerto 5432 no está accesible, **no abrir RDS a Internet**: revisar Security Groups y rutas internas.
 
 **Seguridad:** este preflight no recupera ni imprime `SecretString`. Los permisos IAM para `secretsmanager:GetSecretValue` pueden diferir de los de `DescribeSecret`. Por eso un `SECRET_DESCRIBE_SIN_PERMISOS` no debe resolverse guardando contraseñas en GitHub ni CloudShell.
+
+## Paso 17 — Diagnóstico de dependencias y red (confirmado)
+
+SSM `AWS-RunShellScript` sobre `i-0e3288445cb0df13d` devolvió `Success`. El endpoint RDS `cinegraph-e4-postgres.c3ycssa0e3xz.us-east-1.rds.amazonaws.com` resolvió a `172.31.97.170` y la conexión `TCP/5432` devolvió `RDS_TCP_OK`. AWS CLI está instalado (`2.38.0`); Git y Docker Compose faltan (`GIT_MISSING`, `COMPOSE_MISSING`).
+
+**Alcance de esta prueba:** se validó red, NO la autenticación a PostgreSQL. RDS conserva `PubliclyAccessible=false`.
+
+## Paso 18 — Instalar Git y Docker Compose en la EC2 (siguiente)
+
+Docker Engine `25.0.14` está activo. Amazon Linux 2023 puede instalar `git` con `dnf`; Docker Compose se instalará **como plugin oficial**, no sustituyendo Docker Engine ni agregando repositorios RPM de otras distribuciones. Binario oficial `docker/compose` `v5.6.0` (`x86_64`), con checksum SHA-256 tomado del digest publicado en el asset oficial de GitHub Releases. La instalación manual requiere gestionar futuras actualizaciones del plugin.
+
+Ejecutar en **CloudShell**; el comando se envía a EC2 a través de SSM y solo instala las herramientas que faltan:
+
+```bash
+cd ~/cinegraph-aws
+git pull --ff-only origin main
+unset AWS_PROFILE
+export AWS_REGION=us-east-1
+WEB_INSTANCE_ID=i-0e3288445cb0df13d
+
+PARAMS="$(python3 - <<'PY'
+import json
+cmds = [
+    "set -euo pipefail",
+    "dnf install -y -q git curl",
+    "mkdir -p /usr/local/lib/docker/cli-plugins",
+    "curl --fail --silent --show-error --location --retry 3 https://github.com/docker/compose/releases/download/v5.6.0/docker-compose-linux-x86_64 --output /tmp/cinegraph-compose-v5.6.0",
+    "printf '%s  %s\\n' 40343e21ca777173e69cff5dbafeb37c6f81f3b0d57d9e597f036e95eb63e76a /tmp/cinegraph-compose-v5.6.0 | sha256sum --check",
+    "install -m 0755 /tmp/cinegraph-compose-v5.6.0 /usr/local/lib/docker/cli-plugins/docker-compose",
+    "rm -f /tmp/cinegraph-compose-v5.6.0",
+    "git --version",
+    "docker compose version",
+    "docker buildx version",
+    "systemctl is-active docker",
+]
+print(json.dumps({"commands": cmds}))
+PY
+)"
+
+COMMAND_ID="$(aws ssm send-command \
+  --instance-ids "$WEB_INSTANCE_ID" \
+  --document-name AWS-RunShellScript \
+  --comment 'CineGraph - instalar Git y Compose verificado' \
+  --parameters "$PARAMS" \
+  --query 'Command.CommandId' --output text)"
+
+echo "CommandId: $COMMAND_ID"
+aws ssm wait command-executed \
+  --command-id "$COMMAND_ID" --instance-id "$WEB_INSTANCE_ID"
+aws ssm get-command-invocation \
+  --command-id "$COMMAND_ID" --instance-id "$WEB_INSTANCE_ID" \
+  --query '{Estado:Status,Codigo:ResponseCode,Salida:StandardOutputContent,Error:StandardErrorContent}' \
+  --output json
+```
+
+Esperamos `Success`, código `0`, Git instalado, Compose en `docker compose version`, Docker activo. Si falla `sha256sum`, **no se instala el binario**; inspeccionar el error de descarga antes de reintentar. Si el `wait` termina en error, ejecutar `get-command-invocation` de todas formas con el mismo ID para obtener el detalle.
+
+`docker buildx version` se consulta como control adicional: el paquete Docker de AL2023 puede traer Buildx antiguo, y algunas versiones modernas de Compose exigen Buildx más reciente para construir imágenes. **No modificar Buildx ni arrancar la app hasta revisar esa salida.**
 
 ## Próximas fases
 
