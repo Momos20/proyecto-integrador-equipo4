@@ -32,7 +32,8 @@ Los nombres S3 deben ser globalmente únicos. Si hay colisión, el despliegue fa
 | 8 | Crear `cinegraph-e4-foundation` | **Completo**: `CREATE_COMPLETE` (S3 privado + SG app/RDS) |
 | 9 | Desplegar red privada `cinegraph-e4-db-network` | **Completo**: `CREATE_COMPLETE`; dos subredes privadas y DB Subnet Group |
 | 10 | Verificar subredes, rutas, SG y oferta RDS | **Completo**: red privada validada; salida de oferta paginada | 
-| 11 | Consultar ofertas PostgreSQL 16/gp3 | **Siguiente**: solo lectura, antes de crear RDS |
+| 11 | Consultar ofertas PostgreSQL 16/gp3 | **Completo**: 16.9–16.15, `db.t3.micro`, gp3, cifrado |
+| 12 | Preparar PostgreSQL 16.15 privado | **Siguiente**: validar y desplegar plantilla 03 |
 
 **No quedan recursos de la primera pila**, según el resultado de CloudShell que compartió el equipo. Los scripts temporales de limpieza ya no forman parte del repositorio.
 
@@ -226,6 +227,76 @@ Solo tras verificar la versión y presupuesto se preparará la creación con nom
 
 
 
+
+## Paso 11 — PostgreSQL 16 confirmado (completo)
+
+Salida real de AWS Academy: versiones `16.9`, `16.10`, `16.11`, `16.12`, `16.13`, `16.14` y `16.15` con `db.t3.micro`, `gp3` y `SupportsStorageEncryption=True`. Se selecciona `16.15` por compatibilidad con PostgreSQL 16 del entorno local.
+
+## Paso 12 — Instancia PostgreSQL RDS (por comandos)
+
+Plantilla `cloudformation/03-rds-postgres.yaml`: una instancia `cinegraph-e4-postgres`, PostgreSQL 16.15, `db.t3.micro`, 20 GiB gp3 cifrados, Single-AZ, `PubliclyAccessible=false`, `cinegraph-e4-rds-subnets` y Security Group de RDS. La base inicial es `cinegraph`. El usuario maestro es `cinegraph_admin`, **no es usuario de aplicación**.
+
+Se usa `ManageMasterUserPassword: true`: RDS crea y administra la contraseña maestra con AWS Secrets Manager. **Nunca introducir una contraseña en la línea de comandos ni compartir secretos.** Secrets Manager tiene costo adicional y puede estar restringido por permisos de AWS Academy; CloudFormation `validate-template` no garantiza permisos para crear recursos. Si aparece `AccessDenied`, consultar eventos y detenerse sin sustituir el secreto por una contraseña fija.
+
+`BackupRetentionPeriod: 0` deshabilita backups automáticos solo para esta demostración, no para producción. `DeletionPolicy: Snapshot` protege los datos al retirar la pila, pero las instantáneas retenidas pueden generar cargos. RDS y Secrets Manager empiezan a consumir presupuesto cuando se crean.
+
+**Comandos en CloudShell.** Solo se reemplazan región y cuenta al replicar el laboratorio. El SG se recupera de la pila, sin copiar IDs entre cuentas.
+
+1. Actualizar y obtener SG de RDS:
+
+```bash
+cd ~/cinegraph-aws
+git pull --ff-only origin main
+unset AWS_PROFILE
+export AWS_REGION=us-east-1
+DB_SG="$(aws cloudformation describe-stacks \
+  --stack-name cinegraph-e4-foundation \
+  --query "Stacks[0].Outputs[?OutputKey=='DatabaseSecurityGroupId'].OutputValue | [0]" \
+  --output text)"
+echo "SG de RDS: $DB_SG"
+```
+
+2. Validación de YAML **sin crear recursos**:
+
+```bash
+aws cloudformation validate-template \
+  --template-body file://infrastructure/aws/cloudformation/03-rds-postgres.yaml
+```
+
+3. Creación **real y cobrable** (solo después de validar el YAML y comprobar el presupuesto del Learner Lab):
+
+```bash
+aws cloudformation deploy \
+  --region "$AWS_REGION" \
+  --stack-name cinegraph-e4-postgres \
+  --template-file infrastructure/aws/cloudformation/03-rds-postgres.yaml \
+  --parameter-overrides "DatabaseSecurityGroupId=$DB_SG" \
+  --tags Project=CineGraph Team=E4 Environment=lab \
+  --no-fail-on-empty-changeset
+```
+
+4. Confirmar `CREATE_COMPLETE`, endpoint y ausencia de acceso público:
+
+```bash
+aws cloudformation describe-stacks \
+  --stack-name cinegraph-e4-postgres \
+  --query 'Stacks[0].{Estado:StackStatus,Recursos:Outputs}' \
+  --output json
+
+aws rds describe-db-instances \
+  --db-instance-identifier cinegraph-e4-postgres \
+  --query 'DBInstances[0].{Estado:DBInstanceStatus,Motor:Engine,Version:EngineVersion,Clase:DBInstanceClass,Publica:PubliclyAccessible,Cifrada:StorageEncrypted,Red:DBSubnetGroup.DBSubnetGroupName,Endpoint:Endpoint.Address,Secreto:MasterUserSecret.SecretStatus}' \
+  --output json
+```
+
+Si falla, **no reintentar ni eliminar automáticamente**. Inspeccionar eventos:
+
+```bash
+aws cloudformation describe-stack-events \
+  --stack-name cinegraph-e4-postgres \
+  --query 'StackEvents[].[Timestamp,LogicalResourceId,ResourceStatus,ResourceStatusReason]' \
+  --output table
+```
 
 ## Próximas fases
 

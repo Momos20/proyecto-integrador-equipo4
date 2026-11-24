@@ -1,0 +1,61 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CineGraph E4 - RDS PostgreSQL 16.15 privado en DB Subnet Group existente.
+
+Parameters:
+  DatabaseSubnetGroupName:
+    Type: String
+    Default: cinegraph-e4-rds-subnets
+    Description: DB subnet group privado creado en el Paso 9.
+  DatabaseSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: SG RDS que solo permite 5432 desde el SG de la aplicacion.
+
+Resources:
+  CinegraphPostgres:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: cinegraph-e4-postgres
+      Engine: postgres
+      EngineVersion: '16.15'
+      DBInstanceClass: db.t3.micro
+      DBName: cinegraph
+      MasterUsername: cinegraph_admin
+      ManageMasterUserPassword: true
+      DBSubnetGroupName: !Ref DatabaseSubnetGroupName
+      VPCSecurityGroups:
+        - !Ref DatabaseSecurityGroupId
+      PubliclyAccessible: false
+      MultiAZ: false
+      StorageType: gp3
+      AllocatedStorage: '20'
+      StorageEncrypted: true
+      Port: '5432'
+      AutoMinorVersionUpgrade: false
+      BackupRetentionPeriod: 0
+      DeletionProtection: false
+      CopyTagsToSnapshot: true
+      Tags:
+        - Key: Name
+          Value: cinegraph-e4-postgres
+        - Key: Project
+          Value: CineGraph
+        - Key: Team
+          Value: E4
+        - Key: Environment
+          Value: lab
+
+Outputs:
+  DatabaseIdentifier:
+    Description: Identificador de la instancia PostgreSQL.
+    Value: !Ref CinegraphPostgres
+  DatabaseEndpoint:
+    Description: DNS privado, accesible desde EC2 en la VPC.
+    Value: !GetAtt CinegraphPostgres.Endpoint.Address
+  DatabasePort:
+    Value: !GetAtt CinegraphPostgres.Endpoint.Port
+  DatabaseName:
+    Value: cinegraph
+  DatabaseVersion:
+    Value: '16.15'
