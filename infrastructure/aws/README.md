@@ -29,12 +29,12 @@ Los nombres S3 deben ser globalmente únicos. Si hay colisión, el despliegue fa
 | 5 | `aws cloudfront list-distributions` | `AccessDenied`. No depender de CloudFront |
 | 6 | Primera pila `cinegraph-lab-foundation` | Creada, verificada, luego eliminada por cambio de nombres |
 | 7 | Inspección de S3 vacío y SG libres; script temporal de eliminación | **Completado**: pila antigua y bucket vacío eliminados; consulta de stacks activos sin CineGraph |
-| 8 | Crear `cinegraph-e4-foundation` | **SIGUIENTE PASO** |
-| 9 | Crear red privada `cinegraph-e4-db-network` | Pendiente, ya existe plantilla y script |
+| 8 | Crear `cinegraph-e4-foundation` | **Completo**: `CREATE_COMPLETE` (S3 privado + SG app/RDS) |
+| 9 | Preparar red privada `cinegraph-e4-db-network` | **Siguiente**: validar `02-db-network.sh --plan` |
 
 **No quedan recursos de la primera pila**, según el resultado de CloudShell que compartió el equipo. Los scripts temporales de limpieza ya no forman parte del repositorio.
 
-## Paso 8 — Foundation definitiva (comandos listos)
+## Paso 8 — Foundation definitiva (ejecutado y confirmado)
 
 **1. Actualizar y comprobar identidad.** Cambiar `AWS_REGION` y `VPC_ID` solo si se replica en otra cuenta.
 
@@ -91,9 +91,18 @@ aws cloudformation describe-stack-events \
   --output table
 ```
 
-Tras verificar en CloudShell, actualizar esta bitácora con el estado real y los IDs que devuelva CloudFormation.
+**Resultado real de CloudShell:** validación de plantilla aprobada, `aws cloudformation deploy` finalizó correctamente, `StackStatus=CREATE_COMPLETE`.
 
-## Paso 9 — Red privada de PostgreSQL (solo después del Paso 8)
+| Output | Identificador creado |
+|---|---|
+| BucketName | `cinegraph-e4-datalake-023914826547-us-east-1` |
+| AppSecurityGroupId | `sg-0ac188ee36ce97e55` |
+| DatabaseSecurityGroupId | `sg-0199de1701183b327` |
+| VpcId | `vpc-083d9bebc31224f94` |
+
+La plantilla establece S3 privado y cifrado con SSE-S3 y dos SG; el acceso web no tiene reglas inbound públicas. **No hay instancia EC2 ni RDS creada todavía.** Confirmar con `get-public-access-block` si se necesitan evidencias adicionales del control S3.
+
+## Paso 9 — Red privada de PostgreSQL (siguiente paso)
 
 `cloudformation/02-db-network.yaml` crea dos subredes privadas en distintas AZ, tabla de rutas solo local (sin Internet) y DB Subnet Group; **todavía no crea una instancia RDS**.
 
