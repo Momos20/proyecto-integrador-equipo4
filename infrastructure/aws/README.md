@@ -1708,3 +1708,28 @@ Resultados reportados de CloudShell/SSM:
 - Paso 33: SSM `a47b6a92-3690-4df7-b262-241aedd93f3a`, Success, código 0. Caddy activo en 80/443 y Flask healthy en 127.0.0.1:8000.
 - Paso 34: curl desde CloudShell confirmó TLS 1.3, certificado Let's Encrypt YE1 con hostname coincidente y OpenSSL verify result 0, vencimiento 2027-02-22 01:48:06 UTC. `/health` HTTP 200, HTTP redirige con 308 a HTTPS, `/` HTTP 200, `/api/ready` database=ok/status=ready, catálogo MovieLens 32M devuelve datos reales, `/api/recommendations` sin sesión HTTP 401.
 - URL observada: https://cinegraph-e4.3-84-177-220.sslip.io (IP efímera; verificar si cambia). Pendiente paso 35: login/logout desde navegador y prueba controlada de feedback. A9 aún no confirmado en RDS AWS.
+
+
+## Paso 36 — Kinesis y preflight de servicios (pendiente de evidencia)
+
+Desde CloudShell, con el repositorio actualizado:
+
+```bash
+cd ~/cinegraph-aws
+git pull --ff-only origin main
+bash infrastructure/aws/scripts/10-pipeline-preflight.sh
+```
+
+El script consulta identidad, rol LabRole, bucket existente, Kinesis, Firehose, Glue, SageMaker, Step Functions, EventBridge y CloudWatch. Crea un stream Kinesis de un shard únicamente si recibe ResourceNotFoundException. No crea los demás servicios. Los errores de permisos se registran explícitamente.
+
+## Paso 37 — Firehose y Glue (pendiente)
+
+Verificar confianza IAM y permisos efectivos para Firehose, Glue y S3. Conectar Kinesis al prefijo raw del bucket existente; desplegar transformación real Raw → Curated → Features, validar eventos y deduplicación. No declarar éxito hasta comprobar objetos y resultados.
+
+## Paso 38 — GraphSAGE A9 y publicación RDS (pendiente)
+
+Verificar disponibilidad del Parquet MovieLens 32M, checkpoint original, dependencias y capacidad de cómputo. Ejecutar inferencia real con corte temporal explícito, conservar manifiesto y hashes; adaptar el publicador a S3/RDS AWS con permisos mínimos. No mezclar feedback de 2026 con el experimento histórico ni fabricar rankings.
+
+## Paso 39 — Orquestación y observabilidad (pendiente)
+
+Configurar Step Functions, EventBridge y CloudWatch según roles disponibles. Activar programación únicamente después de validar una ejecución manual completa; conservar evidencias de estados, errores y métricas. No confundir recursos creados con pipeline funcional.
