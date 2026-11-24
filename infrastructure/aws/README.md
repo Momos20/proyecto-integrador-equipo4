@@ -39,7 +39,8 @@ Los nombres S3 deben ser globalmente únicos. Si hay colisión, el despliegue fa
 | 15 | Crear EC2 `cinegraph-e4-web` | **Completo**: `CREATE_COMPLETE`; EC2 `running` y SSM `Online` |
 | 16 | Verificar Docker y bootstrap en EC2 | **Completo**: SSM Success, código 0, Docker activo, cloud-init done |
 | 17 | Comprobar requisitos de app y acceso EC2 → RDS | **Completo**: DNS y TCP 5432 correctos, faltan Git y Compose |
-| 18 | Instalar Git y Docker Compose verificado | **Siguiente**: SSM, sin abrir puertos ni desplegar la app |
+| 18 | Instalar Git y Docker Compose verificado | **Completo**: Git 2.50.1, Compose v5.6.0, SHA-256 correcto; Docker activo |
+| 19 | Actualizar Docker Buildx para Compose | **Siguiente**: actualizar plugin Buildx y verificar, sin levantar la aplicación |
 
 
 
@@ -725,6 +726,63 @@ aws ssm get-command-invocation \
 Esperamos `Success`, código `0`, Git instalado, Compose en `docker compose version`, Docker activo. Si falla `sha256sum`, **no se instala el binario**; inspeccionar el error de descarga antes de reintentar. Si el `wait` termina en error, ejecutar `get-command-invocation` de todas formas con el mismo ID para obtener el detalle.
 
 `docker buildx version` se consulta como control adicional y, si falta, se muestra `BUILDX_MISSING` sin marcar fallida la instalación de Compose: el paquete Docker de AL2023 puede traer Buildx antiguo, y algunas versiones modernas de Compose exigen Buildx más reciente para construir imágenes. **No modificar Buildx ni arrancar la app hasta revisar esa salida.**
+
+## Paso 18 — Git y Docker Compose instalados (resultado real)
+
+AWS Systems Manager devolvió `Success` con código `0`, `CommandId=7f546a30-5287-44c8-9327-bbef4f1a7c2c`. Se verificó `git version 2.50.1`, `Docker Compose version v5.6.0`, Docker Engine `active`, y `/tmp/cinegraph-compose: OK` al comprobar SHA-256. La salida del progreso `curl` aparece en el campo `Error` de SSM por usar stderr, pero **no es un fallo**, porque la descarga y la instalación terminaron exitosamente.
+
+La comprobación también reveló `Docker Buildx 0.12.2-m.2`. Las versiones modernas de Docker Compose requieren Buildx **≥0.17.0** para construir imágenes; **actualizar Buildx antes de `docker compose build`**. No se requiere reemplazar Docker Engine.
+
+## Paso 19 — Actualizar únicamente el plugin Docker Buildx en EC2
+
+Se utiliza el binario Linux amd64 oficial `docker/buildx v0.29.1` (publicado 2025-10-03) desde GitHub Releases, cuya suma oficial SHA-256 para `buildx-v0.29.1.linux-amd64` es `7d2d7d6d4680aa349614965aaa33ccec43f1a9a21e908a5ce4cb6adfa5ad5141`. Se instala en `/usr/local/lib/docker/cli-plugins/docker-buildx`, que tiene prioridad sobre el plugin de distribución; no modifica ni desinstala el paquete RPM preinstalado. Se elige una versión moderna compatible con los requisitos de Compose, sin forzar un salto de Docker Engine. Aunque las versiones API se negocian, confirmar que el builder funciona realmente.
+
+**Comandos de CloudShell:**
+
+```bash
+cd ~/cinegraph-aws
+git pull --ff-only origin main
+unset AWS_PROFILE
+export AWS_REGION=us-east-1
+WEB_INSTANCE_ID=i-0e3288445cb0df13d
+
+PARAMS="$(python3 - <<'PY'
+import json
+commands = [
+    "set -euo pipefail",
+    "mkdir -p /usr/local/lib/docker/cli-plugins",
+    "curl -fSL --retry 3 https://github.com/docker/buildx/releases/download/v0.29.1/buildx-v0.29.1.linux-amd64 -o /tmp/cinegraph-buildx",
+    "echo '7d2d7d6d4680aa349614965aaa33ccec43f1a9a21e908a5ce4cb6adfa5ad5141  /tmp/cinegraph-buildx' | sha256sum -c -",
+    "install -m 0755 /tmp/cinegraph-buildx /usr/local/lib/docker/cli-plugins/docker-buildx",
+    "rm -f /tmp/cinegraph-buildx",
+    "docker buildx version",
+    "docker buildx ls",
+    "docker compose version",
+    "systemctl is-active docker",
+]
+print(json.dumps({"commands": commands}))
+PY
+)"
+
+COMMAND_ID="$(aws ssm send-command \
+  --instance-ids "$WEB_INSTANCE_ID" \
+  --document-name AWS-RunShellScript \
+  --comment 'CineGraph - actualizar Buildx firmado por checksum oficial' \
+  --parameters "$PARAMS" \
+  --query 'Command.CommandId' --output text)"
+
+echo "SSM CommandId: $COMMAND_ID"
+aws ssm wait command-executed \
+  --command-id "$COMMAND_ID" --instance-id "$WEB_INSTANCE_ID"
+aws ssm get-command-invocation \
+  --command-id "$COMMAND_ID" --instance-id "$WEB_INSTANCE_ID" \
+  --query '{Estado:Status,Codigo:ResponseCode,Salida:StandardOutputContent,Error:StandardErrorContent}' \
+  --output json
+```
+
+Se espera `Success`, `/tmp/cinegraph-buildx: OK`, `github.com/docker/buildx v0.29.1`, `docker buildx ls` y Docker `active`. Si falla `wait`, consultar el mismo `COMMAND_ID` con `get-command-invocation` antes de reintentar. Si el nuevo Buildx produce incompatibilidad, retirar **solo** el archivo instalado en `/usr/local/lib/docker/cli-plugins/docker-buildx` mediante SSM para volver al plugin original, sin afectar Docker Engine.
+
+**Después:** comprobar `docker compose build` para una imagen simple antes de desplegar Flask, y definir el Compose AWS exclusivo con PostgreSQL RDS y secretos bajo mínimos permisos. La aplicación y el catálogo en RDS siguen pendientes. La IP pública EC2 no proporciona HTTPS ni habilita el login.
 
 ## Próximas fases
 
