@@ -22,6 +22,55 @@ El resultado esperado es `PLAN OK: 2 subredes privadas + tabla de rutas + DB Sub
 
 Tras aprobar y crear la pila, antes de lanzar RDS se comprobarán sus Output IDs, que las dos subredes estén en AZ distintas, `MapPublicIpOnLaunch=false`, ausencia de rutas externas y el grupo de seguridad de RDS restringido a la aplicación.
 
+## Nombres estandarizados y limpieza de la pila antigua
+
+Se utiliza el prefijo `cinegraph-e4-dev` en todos los recursos nuevos. El nombre del bucket S3 es explícito y determinista: `cinegraph-e4-dev-datalake-<ACCOUNT_ID>-<REGION>`, usando los pseudoparámetros `AWS::AccountId` y `AWS::Region` de CloudFormation. Aunque es muy improbable una colisión, el nombre debe estar disponible en el namespace global de S3.
+
+| Componente | Nuevo nombre |
+|---|---|
+| Foundation stack | `cinegraph-e4-dev-foundation` |
+| Bucket S3 | `cinegraph-e4-dev-datalake-023914826547-us-east-1` |
+| SG app | `cinegraph-e4-dev-app-sg` |
+| SG RDS | `cinegraph-e4-dev-rds-sg` |
+| DB network stack | `cinegraph-e4-dev-db-network` |
+| Subnets RDS | `cinegraph-e4-dev-rds-private-a` y `cinegraph-e4-dev-rds-private-b` |
+
+La **pila antigua**, `cinegraph-lab-foundation`, fue creada con un bucket autogenerado `cinegraph-lab-foundation-datalakebucket-lrnkpdjo5xiv`, SG web `sg-00d7ff2cb71f16854` y SG RDS `sg-004792f0dba4268be`. **No hemos borrado ningún recurso AWS**; su borrado debe hacerse por CloudShell después de verificar que no tiene información.
+
+**Paso 1, inspección sin borrar:**
+
+```bash
+cd ~/cinegraph-aws
+git pull --ff-only origin main
+unset AWS_PROFILE
+export AWS_REGION=us-east-1
+export EXPECTED_ACCOUNT_ID=023914826547
+bash infrastructure/aws/scripts/00-retire-legacy-foundation.sh --inspect
+```
+
+El script verifica cuenta, región, estructura exacta de la pila, ausencia de objetos actuales y versionados en S3 y SG sin interfaces asociadas. Si hay datos, **no permite eliminar**.
+
+**Paso 2, eliminación de recursos antiguos (solo tras revisar Paso 1):**
+
+```bash
+CONFIRM_DELETE_LEGACY_CINEGRAPH=DELETE_cinegraph-lab-foundation \
+  bash infrastructure/aws/scripts/00-retire-legacy-foundation.sh --delete
+```
+
+La política `DeletionPolicy: Retain` conserva el bucket después de eliminar la pila; el script comprueba otra vez que está vacío y después elimina exclusivamente ese bucket. Si falla alguna comprobación, detiene el proceso. No usa `--force` ni elimina objetos.
+
+**Paso 3, crear foundation nueva (solo tras comprobar eliminación):**
+
+```bash
+unset STACK_NAME
+export VPC_ID=vpc-083d9bebc31224f94
+export WEB_INGRESS_MODE=None
+bash infrastructure/aws/scripts/01-foundation.sh --plan
+CONFIRM_LAB_DEPLOY=YES bash infrastructure/aws/scripts/01-foundation.sh --apply
+```
+
+El paso 3 todavía no crea EC2, RDS ni acceso público. El resto del despliegue continúa con `02-db-network.sh`, que ahora referencia `cinegraph-e4-dev-foundation` y `cinegraph-e4-dev-db-network`.
+
 ## Ruta CLI del equipo: EC2 público, RDS privado (alternativa a CloudFront)
 
 Esta ruta sigue **como referencia**, no como receta manual, el laboratorio N0 de SI7002: EC2 para frontend/backend, RDS PostgreSQL como OLTP y VPC/SG. Los siguientes hitos se basan en N1 (S3, streaming, Kinesis/Firehose) y N2 (Curated, Features y Step Functions). **Todos los pasos se harán desde CloudShell con AWS CLI/CloudFormation y validación de resultados**. No se requiere abrir manualmente la consola de servicios; sí iniciar la sesión del Learner Lab y CloudShell.

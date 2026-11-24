@@ -31,7 +31,7 @@ Resources:
       MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: cinegraph-db-private-a
+          Value: cinegraph-e4-dev-rds-private-a
         - Key: Project
           Value: CineGraph
 
@@ -44,7 +44,7 @@ Resources:
       MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: cinegraph-db-private-b
+          Value: cinegraph-e4-dev-rds-private-b
         - Key: Project
           Value: CineGraph
 
@@ -54,7 +54,7 @@ Resources:
       VpcId: !Ref VpcId
       Tags:
         - Key: Name
-          Value: cinegraph-db-private-rt
+          Value: cinegraph-e4-dev-rds-private-rt
         - Key: Project
           Value: CineGraph
 
@@ -79,7 +79,7 @@ Resources:
         - !Ref PrivateSubnetB
       Tags:
         - Key: Name
-          Value: cinegraph-db-subnets
+          Value: cinegraph-e4-dev-rds-subnets
         - Key: Project
           Value: CineGraph
 

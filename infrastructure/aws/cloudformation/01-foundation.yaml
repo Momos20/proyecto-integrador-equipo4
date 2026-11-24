@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >-
   CineGraph Equipo 4 - Base AWS Academy con S3 y security groups.
-  Reutiliza VPC; sin EC2/RDS. El sitio se compartira por HTTPS
+  Reutiliza VPC; recursos con nombres explicitos; HTTPS
   mediante CloudFront cuando el laboratorio lo permita.
 
 Parameters:
@@ -39,6 +39,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
+      BucketName: !Sub 'cinegraph-e4-dev-datalake-${AWS::AccountId}-${AWS::Region}'
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -51,17 +52,24 @@ Resources:
       Tags:
         - Key: Project
           Value: CineGraph
+        - Key: Name
+          Value: cinegraph-e4-dev-datalake
+        - Key: Environment
+          Value: dev
+        - Key: Team
+          Value: E4
         - Key: Purpose
           Value: academic-data-lake
 
   AppSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
+      GroupName: cinegraph-e4-dev-app-sg
       GroupDescription: CineGraph web origin - no public ingress by default
       VpcId: !Ref VpcId
       Tags:
         - Key: Name
-          Value: cinegraph-lab-app
+          Value: cinegraph-e4-dev-app-sg
         - Key: Project
           Value: CineGraph
 
@@ -90,6 +98,7 @@ Resources:
   DatabaseSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
+      GroupName: cinegraph-e4-dev-rds-sg
       GroupDescription: CineGraph RDS - PostgreSQL from application EC2 only
       VpcId: !Ref VpcId
       SecurityGroupIngress:
@@ -100,7 +109,7 @@ Resources:
           SourceSecurityGroupId: !Ref AppSecurityGroup
       Tags:
         - Key: Name
-          Value: cinegraph-lab-db
+          Value: cinegraph-e4-dev-rds-sg
         - Key: Project
           Value: CineGraph
 
