@@ -1,0 +1,10 @@
+# CineGraph Equipo 4. Caddy termina HTTPS y habla con Flask solo por loopback.
+# CINEGRAPH_HOST se inyecta desde Compose y debe coincidir con el DNS publico.
+{
+    admin off
+}
+
+{$CINEGRAPH_HOST} {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:8000
+}
