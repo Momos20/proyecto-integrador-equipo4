@@ -1678,3 +1678,25 @@ Esperado: `DNS_MATCH_OK`, Compose `cinegraph-e4-app` `healthy`, el socket Flask 
 RDS PostgreSQL privado; EC2 con Docker Compose **separado de Floci**, frontend/backend y catálogo; acceso público **HTTPS válido** para que el equipo pueda compartir el enlace e iniciar sesión con usuarios ficticios; Kinesis → Firehose → S3 Raw → Curated/Features, con orquestación según permisos de AWS Academy. Las guías SI7002 N0–N2 son referencias, no pasos de consola.
 
 **Seguridad:** no abrir RDS a Internet, no exponer el login por HTTP, no guardar secretos en Git, no ejecutar `docker compose down -v` sobre el entorno local.
+
+
+## Paso 30 — Preflight HTTPS confirmado (2026-11-23)
+
+Resultados reportados de CloudShell/SSM:
+
+- EC2 web: `i-0e3288445cb0df13d`, IP pública observada `3.84.177.220`.
+- DNS temporal `cinegraph-e4.3-84-177-220.sslip.io` resuelve a la IP observada desde EC2.
+- `cinegraph-e4-app` está healthy con `127.0.0.1:8000->8000/tcp`.
+- No hay escuchas de 80/443; SG web `sg-0ac188ee36ce97e55` no tiene reglas ingress.
+- `05-web-https-ingress.yaml` pasó `aws cloudformation validate-template`.
+- **Todavía no existe HTTPS público ni certificado validado.**
+
+## Paso 31 — Proxy Caddy preparado en Git (pendiente de ejecutar en EC2)
+
+- `infrastructure/aws/Caddyfile`: variable `CINEGRAPH_HOST` y upstream `127.0.0.1:8000`.
+- `infrastructure/aws/compose.https.yaml`: servicio Caddy aislado del Compose Flask, imagen versionada, red del host, volúmenes persistentes `/data` y `/config`, y sin base de datos local.
+- `tests/test_aws_https_proxy.py`: guardas estáticas de seguridad.
+- **No hacer `docker compose up` del proxy ni abrir SG hasta validar los archivos en EC2** mediante `docker compose config` y `caddy validate`.
+- Para emitir un certificado público posteriormente, se necesitarán puertos TCP 80/443 hacia la EC2, DNS apuntando a la IP actual, conectividad saliente con ACME y ausencia de límites de emisión.
+- Si cambia la IP pública de EC2, recalcular `CINEGRAPH_HOST` y repetir la verificación DNS antes de acceder al sitio. No divulgar como funcional hasta pasar `curl` HTTPS con validación estricta de certificado y los smoke tests de aplicación.
+
