@@ -21,7 +21,7 @@ class PrivateDatabaseNetworkTests(unittest.TestCase):
 
     def test_script_requires_confirmed_foundation_and_explicit_apply(self):
         script = (AWS / "scripts/02-db-network.sh").read_text("utf-8")
-        self.assertIn('FOUNDATION_STACK_NAME:-cinegraph-e4-dev-foundation', script)
+        self.assertIn('FOUNDATION_STACK_NAME:-cinegraph-e4-foundation', script)
         self.assertIn("CREATE_COMPLETE|UPDATE_COMPLETE", script)
         self.assertIn("CONFIRM_LAB_DEPLOY", script)
         self.assertIn("cloudformation validate-template", script)

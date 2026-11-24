@@ -39,7 +39,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      BucketName: !Sub 'cinegraph-e4-dev-datalake-${AWS::AccountId}-${AWS::Region}'
+      BucketName: !Sub 'cinegraph-e4-datalake-${AWS::AccountId}-${AWS::Region}'
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -53,9 +53,9 @@ Resources:
         - Key: Project
           Value: CineGraph
         - Key: Name
-          Value: cinegraph-e4-dev-datalake
+          Value: cinegraph-e4-datalake
         - Key: Environment
-          Value: dev
+          Value: lab
         - Key: Team
           Value: E4
         - Key: Purpose
@@ -64,12 +64,12 @@ Resources:
   AppSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: cinegraph-e4-dev-app-sg
+      GroupName: cinegraph-e4-app-sg
       GroupDescription: CineGraph web origin - no public ingress by default
       VpcId: !Ref VpcId
       Tags:
         - Key: Name
-          Value: cinegraph-e4-dev-app-sg
+          Value: cinegraph-e4-app-sg
         - Key: Project
           Value: CineGraph
 
@@ -98,7 +98,7 @@ Resources:
   DatabaseSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: cinegraph-e4-dev-rds-sg
+      GroupName: cinegraph-e4-rds-sg
       GroupDescription: CineGraph RDS - PostgreSQL from application EC2 only
       VpcId: !Ref VpcId
       SecurityGroupIngress:
@@ -109,7 +109,7 @@ Resources:
           SourceSecurityGroupId: !Ref AppSecurityGroup
       Tags:
         - Key: Name
-          Value: cinegraph-e4-dev-rds-sg
+          Value: cinegraph-e4-rds-sg
         - Key: Project
           Value: CineGraph
 

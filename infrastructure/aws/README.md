@@ -4,7 +4,7 @@
 
 ## Fase 2: red privada de PostgreSQL — plantilla preparada, sin ejecutar
 
-La pila independiente `cloudformation/02-db-network.yaml` reutiliza la VPC de `cinegraph-e4-dev-foundation` (después del cambio de nombres) y crea **dos subredes privadas en dos AZ**, una tabla de rutas que solo contiene la ruta implícita local de la VPC y un `AWS::RDS::DBSubnetGroup`. No crea una instancia de base de datos ni EC2 y no crea NAT Gateway. El Security Group privado de RDS ya existe en la pila foundation; se reutilizará cuando despleguemos PostgreSQL.
+La pila independiente `cloudformation/02-db-network.yaml` reutiliza la VPC de `cinegraph-e4-foundation` (después del cambio de nombres) y crea **dos subredes privadas en dos AZ**, una tabla de rutas que solo contiene la ruta implícita local de la VPC y un `AWS::RDS::DBSubnetGroup`. No crea una instancia de base de datos ni EC2 y no crea NAT Gateway. El Security Group privado de RDS ya existe en la pila foundation; se reutilizará cuando despleguemos PostgreSQL.
 
 De acuerdo con el diagnóstico real de la VPC, las seis subredes actuales ocupan `172.31.0.0/20` hasta `172.31.80.0/20`. Los candidatos `172.31.96.0/24` (us-east-1a) y `172.31.97.0/24` (us-east-1b) están libres **según esa consulta**. El script comprueba nuevamente la VPC, las zonas disponibles y los solapamientos antes de permitir crear nada.
 
@@ -24,16 +24,16 @@ Tras aprobar y crear la pila, antes de lanzar RDS se comprobarán sus Output IDs
 
 ## Nombres estandarizados y limpieza de la pila antigua
 
-Se utiliza el prefijo `cinegraph-e4-dev` en todos los recursos nuevos. El nombre del bucket S3 es explícito y determinista: `cinegraph-e4-dev-datalake-<ACCOUNT_ID>-<REGION>`, usando los pseudoparámetros `AWS::AccountId` y `AWS::Region` de CloudFormation. Aunque es muy improbable una colisión, el nombre debe estar disponible en el namespace global de S3.
+Se utiliza el prefijo `cinegraph-e4` en todos los recursos nuevos (`e4` identifica al Equipo 4), sin el sufijo de entorno en los nombres. El nombre del bucket S3 es explícito y determinista: `cinegraph-e4-datalake-<ACCOUNT_ID>-<REGION>`, usando los pseudoparámetros `AWS::AccountId` y `AWS::Region` de CloudFormation. Aunque es muy improbable una colisión, el nombre debe estar disponible en el namespace global de S3.
 
 | Componente | Nuevo nombre |
 |---|---|
-| Foundation stack | `cinegraph-e4-dev-foundation` |
-| Bucket S3 | `cinegraph-e4-dev-datalake-023914826547-us-east-1` |
-| SG app | `cinegraph-e4-dev-app-sg` |
-| SG RDS | `cinegraph-e4-dev-rds-sg` |
-| DB network stack | `cinegraph-e4-dev-db-network` |
-| Subnets RDS | `cinegraph-e4-dev-rds-private-a` y `cinegraph-e4-dev-rds-private-b` |
+| Foundation stack | `cinegraph-e4-foundation` |
+| Bucket S3 | `cinegraph-e4-datalake-023914826547-us-east-1` |
+| SG app | `cinegraph-e4-app-sg` |
+| SG RDS | `cinegraph-e4-rds-sg` |
+| DB network stack | `cinegraph-e4-db-network` |
+| Subnets RDS | `cinegraph-e4-rds-private-a` y `cinegraph-e4-rds-private-b` |
 
 La **pila antigua**, `cinegraph-lab-foundation`, fue creada con un bucket autogenerado `cinegraph-lab-foundation-datalakebucket-lrnkpdjo5xiv`, SG web `sg-00d7ff2cb71f16854` y SG RDS `sg-004792f0dba4268be`. **No hemos borrado ningún recurso AWS**; su borrado debe hacerse por CloudShell después de verificar que no tiene información.
 
@@ -69,7 +69,7 @@ bash infrastructure/aws/scripts/01-foundation.sh --plan
 CONFIRM_LAB_DEPLOY=YES bash infrastructure/aws/scripts/01-foundation.sh --apply
 ```
 
-El paso 3 todavía no crea EC2, RDS ni acceso público. El resto del despliegue continúa con `02-db-network.sh`, que ahora referencia `cinegraph-e4-dev-foundation` y `cinegraph-e4-dev-db-network`.
+El paso 3 todavía no crea EC2, RDS ni acceso público. El resto del despliegue continúa con `02-db-network.sh`, que ahora referencia `cinegraph-e4-foundation` y `cinegraph-e4-db-network`.
 
 ## Ruta CLI del equipo: EC2 público, RDS privado (alternativa a CloudFront)
 

@@ -7,17 +7,17 @@ AWS=ROOT/"infrastructure/aws"
 class AwsNamingTests(unittest.TestCase):
     def test_bucket_and_groups_have_explicit_professional_names(self):
         s=(AWS/"cloudformation/01-foundation.yaml").read_text("utf-8")
-        self.assertIn("BucketName: !Sub 'cinegraph-e4-dev-datalake-${AWS::AccountId}-${AWS::Region}'",s)
-        self.assertIn("GroupName: cinegraph-e4-dev-app-sg",s)
-        self.assertIn("GroupName: cinegraph-e4-dev-rds-sg",s)
+        self.assertIn("BucketName: !Sub 'cinegraph-e4-datalake-${AWS::AccountId}-${AWS::Region}'",s)
+        self.assertIn("GroupName: cinegraph-e4-app-sg",s)
+        self.assertIn("GroupName: cinegraph-e4-rds-sg",s)
         self.assertIn("DeletionPolicy: Retain",s)
         self.assertIn("Default: None",s)
     def test_stack_names_consistent(self):
         s=(AWS/"scripts/01-foundation.sh").read_text("utf-8")
         db=(AWS/"scripts/02-db-network.sh").read_text("utf-8")
-        self.assertIn("STACK_NAME:-cinegraph-e4-dev-foundation",s)
-        self.assertIn("FOUNDATION_STACK_NAME:-cinegraph-e4-dev-foundation",db)
-        self.assertIn("DB_NETWORK_STACK_NAME:-cinegraph-e4-dev-db-network",db)
+        self.assertIn("STACK_NAME:-cinegraph-e4-foundation",s)
+        self.assertIn("FOUNDATION_STACK_NAME:-cinegraph-e4-foundation",db)
+        self.assertIn("DB_NETWORK_STACK_NAME:-cinegraph-e4-db-network",db)
     def test_old_stack_cleanup_is_bounded(self):
         s=(AWS/"scripts/00-retire-legacy-foundation.sh").read_text("utf-8")
         for part in ('MODE="${1:---inspect}"',"EXPECTED_ACCOUNT_ID",

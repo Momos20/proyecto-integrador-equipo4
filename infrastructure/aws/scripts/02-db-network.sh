@@ -14,8 +14,8 @@ AWS=(aws)
 if [[ -n "${AWS_PROFILE:-}" ]]; then AWS+=(--profile "$AWS_PROFILE"); fi
 AWS+=(--region "$REGION")
 
-FOUNDATION_STACK="${FOUNDATION_STACK_NAME:-cinegraph-e4-dev-foundation}"
-STACK="${DB_NETWORK_STACK_NAME:-cinegraph-e4-dev-db-network}"
+FOUNDATION_STACK="${FOUNDATION_STACK_NAME:-cinegraph-e4-foundation}"
+STACK="${DB_NETWORK_STACK_NAME:-cinegraph-e4-db-network}"
 TEMPLATE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/cloudformation/02-db-network.yaml"
 AZ_A="${PRIVATE_DB_AZ_A:-${REGION}a}"
 AZ_B="${PRIVATE_DB_AZ_B:-${REGION}b}"
@@ -113,7 +113,7 @@ echo "Creando solo subredes, tabla de rutas y DB Subnet Group; sin instancia RDS
     "VpcId=$VPC_ID" \
     "AvailabilityZoneA=$AZ_A" "AvailabilityZoneB=$AZ_B" \
     "PrivateCidrA=$CIDR_A" "PrivateCidrB=$CIDR_B" \
-  --tags Project=CineGraph Environment=dev Team=E4 \
+  --tags Project=CineGraph Environment=lab Team=E4 \
   --no-fail-on-empty-changeset
 echo "Recursos de red de BD:"
 "${AWS[@]}" cloudformation describe-stacks --stack-name "$STACK" \

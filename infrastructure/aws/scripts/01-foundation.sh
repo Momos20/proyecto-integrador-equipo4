@@ -56,7 +56,7 @@ PY
   *)
     echo "ERROR: WEB_INGRESS_MODE debe ser None, RestrictedIP o CloudFront" >&2; exit 2 ;;
 esac
-STACK="${STACK_NAME:-cinegraph-e4-dev-foundation}"
+STACK="${STACK_NAME:-cinegraph-e4-foundation}"
 TEMPLATE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/cloudformation/01-foundation.yaml"
 echo "AWS: region=$REGION | credenciales=${PROFILE:-CloudShell nativo} | stack=$STACK"
 "${AWS[@]}" sts get-caller-identity --query Account --output text >/dev/null
@@ -77,7 +77,7 @@ fi
   --template-file "$TEMPLATE" \
   --parameter-overrides "VpcId=$VPC_ID" "WebIngressMode=$INGRESS" \
     "AllowedClientCidr=$CIDR" "CloudFrontPrefixListId=$PREFIX_LIST_ID" \
-  --tags Project=CineGraph Environment=dev Team=E4 \
+  --tags Project=CineGraph Environment=lab Team=E4 \
   --no-fail-on-empty-changeset
 "${AWS[@]}" cloudformation describe-stacks --stack-name "$STACK" \
   --query 'Stacks[0].Outputs[].[OutputKey,OutputValue]' --output table
