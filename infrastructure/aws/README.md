@@ -47,7 +47,8 @@ Los nombres S3 deben ser globalmente únicos. Si hay colisión, el despliegue fa
 | 23 | Aplicar esquema e importar catálogo MovieLens a RDS | **Completo**: SQL aplicado, 87585 películas, transacción confirmada (RDS_COMMIT_OK) |
 | 24 | Verificar lectura post-importación | **Completo**: SCHEMA_MOVIES_EXISTS=True, 87585 filas y registro válido |
 | 25 | Auditar preparación de usuario SQL y cuentas demo | **Completo**: ningún secreto ni cuenta existente, esquema verificado |
-| 26 | Crear identidad SQL y cuentas demo segregadas | **Siguiente**: secretsmanager y transacción SQL, sin imprimir contraseñas |
+| 26 | Crear identidad SQL y cuentas demo segregadas | **Completo**: dos secretos creados, rol cinegraph_app, tres cuentas, login TLS validado |
+| 27 | Probar lectura del secreto y catálogo desde contenedor aislado | **Siguiente**: smoke test con rol SQL app, sin master, sin red pública |
 
 
 
@@ -1352,6 +1353,89 @@ aws ssm get-command-invocation \
 **Esperado:** `Success` y `Codigo=0` con `RDS_SQL_COMMIT_OK`, `APP_SQL_LOGIN_OK` y `AWS_APP_IDENTITIES_READY`. **Si falla**, consultar el mismo `COMMAND_ID` (no volver a generar secretos inmediatamente), evaluar el `stage` y `code` del error; no mostrar passwords ni intentar crear rol con claves hardcodeadas.
 
 No son perfiles humanos de MovieLens ni datos reales de los evaluadores. Para recuperar credenciales de demostración cuando el sitio HTTPS esté disponible, usar el acceso autorizado a Secrets Manager, sin copiarlas a la bitácora ni compartirlas en texto claro por el chat.
+
+## Paso 26 — Rol de aplicación y cuentas creadas en AWS (confirmado)
+
+`AWS-RunShellScript` finalizó con `Status=Success`, código `0`. Se recibió la siguiente salida real:
+
+```text
+RDS_CONNECTION_OK: PostgreSQL 16, TLS verify-full
+CATALOG_VERIFIED: 87585
+SECRET_CINEGRAPH_E4_APP_DB_CREATED
+SECRET_CINEGRAPH_E4_DEMO_USERS_CREATED
+CATALOG_VERIFIED: 87585
+RDS_SQL_COMMIT_OK: cinegraph_app y 3 cuentas demo
+APP_SQL_LOGIN_OK: TLS verify-full, lectura de catalogo y rol sin UPDATE en movies
+AWS_APP_IDENTITIES_READY: credenciales solo en Secrets Manager
+```
+
+Se crearon los secretos `cinegraph-e4-app-db` y `cinegraph-e4-demo-users`; el rol SQL `cinegraph_app` con acceso limitado; y las cuentas de laboratorio `cine414`, `cine123`, `cine456`. La aplicación **todavía no se ejecuta** y las recomendaciones A9 **todavía no están importadas en RDS**. Los secretos nunca se imprimieron.
+
+## Paso 27 — Smoke test del acceso a RDS desde Docker Bridge (siguiente)
+
+Objetivo: comprobar que el **contenedor** puede obtener sus propias credenciales `cinegraph-e4-app-db` usando el rol IAM de EC2 vía IMDSv2, y conectarse mediante PostgreSQL `cinegraph_app` con TLS `verify-full`. La operación es de **solo lectura**, usa `SET TRANSACTION READ ONLY`, confirma filas MovieLens, tres cuentas demo y los permisos limitados. No usa el secreto maestro RDS ni el de contraseñas demo. No abre puertos ni inicia Flask. Código: `infrastructure/aws/scripts/06-app-db-smoke.py`.
+
+Esta prueba utiliza `--network bridge` (la red predeterminada de Docker) para validar acceso a IAM desde contenedor, antes de elegir la topología del servicio definitivo. EC2 tiene IMDSv2 requerido con `HttpPutResponseHopLimit=2`, pero la prueba real determinará si el SDK logra obtener las credenciales. Si falla en `read_app_secret`, **no** reenviar credenciales por SSM o variables de entorno: revisar IMDS, enrutamiento y permisos.
+
+**En CloudShell:**
+
+```bash
+cd ~/cinegraph-aws
+git pull --ff-only origin main
+unset AWS_PROFILE
+export AWS_REGION=us-east-1
+
+WEB_INSTANCE_ID=i-0e3288445cb0df13d
+RDS_ENDPOINT="$(aws cloudformation describe-stacks \
+  --stack-name cinegraph-e4-postgres \
+  --query "Stacks[0].Outputs[?OutputKey=='DatabaseEndpoint'].OutputValue | [0]" \
+  --output text)"
+
+PARAMS="$(python3 - "$AWS_REGION" "$RDS_ENDPOINT" <<'PY'
+import json, shlex, sys
+region, host = sys.argv[1:3]
+docker = (
+    "docker run --rm --network bridge --read-only "
+    "--tmpfs /tmp:rw,noexec,nosuid,nodev,size=16m "
+    "--cap-drop ALL --security-opt no-new-privileges "
+    "-e PYTHONDONTWRITEBYTECODE=1 "
+    "-e AWS_REGION=" + shlex.quote(region) + " "
+    "-e RDS_ENDPOINT=" + shlex.quote(host) + " "
+    "-e APP_DB_SECRET_ID=cinegraph-e4-app-db "
+    "-v /opt/cinegraph/source:/workspace:ro "
+    "--entrypoint python cinegraph-e4-app:main "
+    "/workspace/infrastructure/aws/scripts/06-app-db-smoke.py"
+)
+print(json.dumps({"commands":[
+    "set -euo pipefail",
+    "cd /opt/cinegraph/source",
+    "git pull --ff-only origin main",
+    "docker image inspect cinegraph-e4-app:main >/dev/null",
+    docker
+]}))
+PY
+)"
+
+COMMAND_ID="$(aws ssm send-command \
+  --instance-ids "$WEB_INSTANCE_ID" \
+  --document-name AWS-RunShellScript \
+  --comment 'CineGraph: comprobar RDS con rol app e IAM desde Docker bridge' \
+  --parameters "$PARAMS" \
+  --query 'Command.CommandId' --output text)"
+
+echo "CommandId: $COMMAND_ID"
+aws ssm wait command-executed \
+  --command-id "$COMMAND_ID" --instance-id "$WEB_INSTANCE_ID"
+
+aws ssm get-command-invocation \
+  --command-id "$COMMAND_ID" --instance-id "$WEB_INSTANCE_ID" \
+  --query '{Estado:Status,Codigo:ResponseCode,Salida:StandardOutputContent,Error:StandardErrorContent}' \
+  --output json
+```
+
+**Resultado esperado:** `Success`, código `0`, `APP_SECRET_ACCESS_OK`, `APP_DATABASE_ROLE_OK`, `APP_DATABASE_TLS_OK`, `APP_CATALOG_OK: 87585`, `APP_DEMO_ACCOUNTS_OK: 3`, `APP_PERMISSIONS_OK` y `APP_DB_SMOKE_SUCCESS: sin escrituras`.
+
+Si `wait` falla, consultar de todas formas `get-command-invocation` con el mismo `COMMAND_ID` para identificar `stage`, sin iniciar un nuevo comando. En particular, errores IMDS/Boto3 dentro de Docker requieren analizar la red de contenedor. El servicio web seguirá sin publicarse hasta instalar un proxy HTTPS válido.
 
 ## Próximas fases
 
