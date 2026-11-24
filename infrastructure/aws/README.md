@@ -50,7 +50,8 @@ Los nombres S3 deben ser globalmente únicos. Si hay colisión, el despliegue fa
 | 26 | Crear identidad SQL y cuentas demo segregadas | **Completo**: dos secretos creados, rol cinegraph_app, tres cuentas, login TLS validado |
 | 27 | Probar lectura del secreto y catálogo desde contenedor aislado | **Completo**: APP_DB_SMOKE_SUCCESS, IAM, TLS, 87585 películas, 3 cuentas |
 | 28 | Iniciar Flask/Gunicorn en EC2 solo loopback | **Completo**: Compose healthy, /health, /api/ready y /api/catalog OK |
-| 29 | Verificar login/logout de cuentas demo y rutas privadas | **Siguiente**: Flask test_client HTTPS simulado desde EC2, sin escrituras |
+| 29 | Verificar login/logout de cuentas demo y rutas privadas | **Completo**: login cine414, CSRF, sesión, logout, acceso privado verificado; A9 no publicado |
+| 30 | Preparar HTTPS con DNS de laboratorio, sin abrir reglas aún | **Siguiente**: DNS sslip.io y validar plantilla ingress 80/443 solo lectura |
 
 
 
@@ -1581,6 +1582,96 @@ aws ssm get-command-invocation \
 **Esperado:** `Success`, código `0`, `AUTH_TEST_FRONTEND_OK`, `AUTH_TEST_LOGIN_OK: cine414; secure cookie`, `AUTH_TEST_PRIVATE_READS_OK`, `AUTH_TEST_LOGOUT_OK` y `CINEGRAPH_AUTH_SMOKE_SUCCESS: sin escrituras a RDS`.
 
 La prueba no hace HTTPS de red; solo simula el contexto HTTPS de Flask para verificar cookies y CSRF. **No compartir IP pública ni habilitar login por HTTP.** Tras verificar autenticación, el siguiente objetivo es evaluar una URL de demostración HTTPS real, conforme a los permisos de AWS Academy, y luego integrar la publicación de predicciones GraphSAGE A9.
+
+## Paso 29 — Login y logout de CineGraph validados (confirmado)
+
+En `i-0e3288445cb0df13d`, Systems Manager ejecutó el test de autenticación `09-auth-smoke.py` con `CommandId=a508ded4-2620-4e31-8e14-2294e3a2f044`, `Status=Success` y código `0`. Salida real:
+
+```text
+AUTH_TEST_SECRET_ACCESS_OK
+AUTH_TEST_FRONTEND_OK
+AUTH_TEST_STATIC_OK
+AUTH_TEST_CATALOG_OK
+AUTH_TEST_UNAUTHENTICATED_401_OK
+AUTH_TEST_LOGIN_OK: cine414; secure cookie
+AUTH_TEST_SESSION_OK
+AUTH_TEST_PRIVATE_READS_OK
+AUTH_TEST_A9_NOT_PUBLISHED: no_recommendations
+AUTH_TEST_LOGOUT_OK
+CINEGRAPH_AUTH_SMOKE_SUCCESS: sin escrituras a RDS
+```
+
+**Alcance:** login/log out, cookies, CSRF, catálogo y rutas privadas funcionales en `Flask.test_client` con HTTPS simulado. Esto NO constituye HTTPS público, y `A9` aún no tiene recomendaciones publicadas en RDS. El servidor sigue ligado a loopback y el SG de app no tiene reglas entrantes.
+
+## Paso 30 — Verificar DNS temporal y plantilla de HTTPS, sin cambiar AWS
+
+Para un enlace académico se puede usar un hostname de `sslip.io` que traduzca la IP pública de EC2, sin registrar ni contratar dominio. Por ejemplo, si la IP sigue siendo `3.84.177.220`, el **candidato, aún no publicado**, es `cinegraph-e4.3-84-177-220.sslip.io`. La correspondencia DNS debe comprobarse en CloudShell y EC2 antes de desplegar el proxy. `sslip.io` es un servicio DNS externo gratuito; si falla o la IP pública cambia al detener la instancia, el enlace dejará de servir. Su uso está sujeto a la disponibilidad de DNS y límites de emisión de certificados del proveedor ACME. Documentación: https://nip.io/ y https://caddyserver.com/docs/automatic-https.
+
+Se preparó `cloudformation/05-web-https-ingress.yaml` con exactamente dos reglas nuevas en el SG existente de app: puerto 80 (validación ACME y redirect) y 443 (HTTPS). No abre SSH, PostgreSQL ni Flask/8000. La plantilla se verificará en CloudShell pero **no se desplegará aún**; primero confirmar DNS, IP, SG y que Flask permanece en loopback. El stack previsto se llamará `cinegraph-e4-https-ingress`. Se mantendrá la gestión de recursos desde CloudFormation, sin editar SG a mano.
+
+**Ejecutar el siguiente preflight de solo lectura desde CloudShell:**
+
+```bash
+cd ~/cinegraph-aws
+git pull --ff-only origin main
+unset AWS_PROFILE
+export AWS_REGION=us-east-1
+
+WEB_INSTANCE_ID=i-0e3288445cb0df13d
+APP_SG=sg-0ac188ee36ce97e55
+PUBLIC_IP="$(aws ec2 describe-instances \
+  --instance-ids "$WEB_INSTANCE_ID" \
+  --query 'Reservations[0].Instances[0].PublicIpAddress' \
+  --output text)"
+CINEGRAPH_HOST="cinegraph-e4.${PUBLIC_IP//./-}.sslip.io"
+echo "IP: $PUBLIC_IP"
+echo "HOST_CANDIDATO: $CINEGRAPH_HOST"
+
+aws ec2 describe-security-groups \
+  --group-ids "$APP_SG" \
+  --query 'SecurityGroups[0].{SG:GroupId,Ingress:IpPermissions}' \
+  --output json
+
+aws cloudformation validate-template \
+  --template-body file://infrastructure/aws/cloudformation/05-web-https-ingress.yaml
+
+PARAMS="$(python3 - "$PUBLIC_IP" "$CINEGRAPH_HOST" <<'PY'
+import json, shlex, sys
+public_ip, host = sys.argv[1:3]
+command = (
+    "DNS_IP=$(getent ahostsv4 " + shlex.quote(host)
+    + " | awk '$2==\"STREAM\" {print $1; exit}'); "
+    "echo DNS_RESULT=${DNS_IP:-MISSING}; "
+    "test \"$DNS_IP\" = " + shlex.quote(public_ip)
+    + " && echo DNS_MATCH_OK || echo DNS_MATCH_FAILED"
+)
+print(json.dumps({"commands":[
+    "set -euo pipefail",
+    command,
+    "docker ps --filter name=cinegraph-e4-app --format '{{.Names}} {{.Status}} {{.Ports}}'",
+    "ss -lnt | grep -E '(:80|:443|:8000)[[:space:]]' || true",
+]}))
+PY
+)"
+
+COMMAND_ID="$(aws ssm send-command \
+  --instance-ids "$WEB_INSTANCE_ID" \
+  --document-name AWS-RunShellScript \
+  --comment 'CineGraph: verificar DNS temporal y puertos antes de HTTPS' \
+  --parameters "$PARAMS" \
+  --query 'Command.CommandId' --output text)"
+
+echo "CommandId: $COMMAND_ID"
+aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$WEB_INSTANCE_ID"
+aws ssm get-command-invocation \
+  --command-id "$COMMAND_ID" --instance-id "$WEB_INSTANCE_ID" \
+  --query '{Estado:Status,Codigo:ResponseCode,Salida:StandardOutputContent,Error:StandardErrorContent}' \
+  --output json
+```
+
+Esperado: `DNS_MATCH_OK`, Compose `cinegraph-e4-app` `healthy`, el socket Flask `127.0.0.1:8000` y **sin** proceso escuchando ya en 80/443. Si el hostname no resuelve a la IP de EC2, no abrir reglas ni arrancar Caddy hasta resolver la discrepancia. `validate-template` solo valida sintaxis CloudFormation; **no crea recursos**.
+
+**Secuencia posterior:** preparar y validar `Caddyfile` con proxy a `127.0.0.1:8000`, instalar proxy reversible y después desplegar únicamente ingreso público 80/443 por CloudFormation para que Caddy obtenga certificado de una CA pública. Antes de compartir un enlace, comprobar `curl --fail https://.../health` sin `--insecure`, cadena TLS válida, HTTPS real, cabeceras de seguridad y login externo. No comunicar un enlace como funcional antes de confirmar emisión del certificado.
 
 ## Próximas fases
 

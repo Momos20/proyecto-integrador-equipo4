@@ -1,0 +1,35 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  CineGraph E4 - ingreso exclusivo HTTP ACME 80 y HTTPS 443 hacia proxy Caddy
+  en SG web existente. No abre Flask 8000, SSH 22 ni PostgreSQL 5432.
+
+Parameters:
+  AppSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Security Group existente de CineGraph app, no RDS.
+
+Resources:
+  AcmeHttpIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: HTTP 80 solo para desafio ACME y redireccion HTTPS.
+      GroupId: !Ref AppSecurityGroupId
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      CidrIp: 0.0.0.0/0
+
+  HttpsIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: HTTPS 443 hacia reverse proxy Caddy, no directamente Flask.
+      GroupId: !Ref AppSecurityGroupId
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      CidrIp: 0.0.0.0/0
+
+Outputs:
+  AppSecurityGroupId:
+    Description: SG existente al que se le agregaron reglas web.
+    Value: !Ref AppSecurityGroupId
