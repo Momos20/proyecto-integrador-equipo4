@@ -42,7 +42,8 @@ Los nombres S3 deben ser globalmente únicos. Si hay colisión, el despliegue fa
 | 18 | Instalar Git y Docker Compose verificado | **Completo**: Git 2.50.1, Compose v5.6.0, SHA-256 correcto; Docker activo |
 | 19 | Actualizar Docker Buildx para Compose | **Completo**: Buildx v0.29.1, plugin verificado, BuildKit operativo |
 | 20 | Clonar fuente y construir imagen Flask en EC2 | **Completo**: SHA de Git, BUILD_IMAGE_OK, FLASK_IMPORT_OK, código SSM 0 |
-| 21 | Verificar lectura segura del secreto y catálogo MovieLens | **Siguiente**: acceso IAM desde EC2 y checksum MD5, sin imprimir secretos |
+| 21 | Verificar lectura segura del secreto y catálogo MovieLens | **Completo**: SSM Success, SECRET_ACCESS_OK, SQL_FILES_OK y MOVIELENS_MD5_OK |
+| 22 | Validar conexión TLS y estado de esquema RDS | **Siguiente**: bootstrap --plan, solo lectura; importar después de validación |
 
 
 
@@ -913,6 +914,93 @@ aws ssm get-command-invocation \
 Éxito: `Success`, `Codigo=0`, `SECRET_ACCESS_OK`, `SQL_FILES_OK`, `MOVIELENS_MD5_OK`. Si no tiene permiso para acceder al secreto, **no** sustituir la configuración por una contraseña fija en shell o repositorio; verificar el alcance de las políticas del laboratorio.
 
 Una vez validados estos requisitos, el siguiente paso será implementar el bootstrap RDS de forma transaccional e idempotente usando las tablas del repositorio y los datos originales, separando las cuentas de aplicación del usuario maestro `cinegraphadmin`. No trasladar a AWS cuentas locales ni datos de Floci.
+
+## Paso 21 — Secreto IAM, SQL y MovieLens validados (confirmado)
+
+Ejecutado en EC2 mediante SSM `CommandId=ddf247dc-20c9-448d-a5db-f4fac4d93199`, `Status=Success`, código `0`. La salida real fue:
+
+```text
+SECRET_ACCESS_OK
+SQL_FILES_OK
+MOVIELENS_MD5_OK
+```
+
+Esto confirma el permiso `secretsmanager:GetSecretValue` desde el perfil de instancia y el checksum MD5 del CSV original MovieLens 32M. **No valida aún conexión autenticada a RDS**; se comprobará ahora. No se consultó ni imprimió ninguna contraseña.
+
+## Paso 22 — Bootstrap de RDS: plan sin escrituras (siguiente)
+
+Código reproducible: `infrastructure/aws/scripts/03-bootstrap-rds.py`. Se ejecuta **solo desde EC2** dentro de un contenedor efímero basado en `cinegraph-e4-app:main` (que ya incluye psycopg 3 y boto3). **No utiliza** `docker-compose.yml` local ni requiere `pip install` en EC2.
+
+El script tiene dos modos: `--plan` consulta el estado de PostgreSQL sin hacer escrituras; `--apply` ejecutará después los cinco SQL de esquema/migraciones y cargará las 87.585 películas desde las tres partes originales, verificando MD5 y filas. `--apply` está protegido por `CONFIRM_RDS_IMPORT=YES`, usa una única transacción y no crea usuarios de login ni recomendaciones ficticias.
+
+La contraseña maestra de `cinegraphadmin` solo se recupera **dentro del proceso Python del contenedor**, mediante boto3 y `LabRole`, y se conserva en memoria durante la operación. Los comandos SSM incluyen únicamente el ARN de un secreto, **no** su valor. El script requiere TLS `verify-full` y descarga el CA bundle oficial de RDS a un directorio temporal de memoria. Ver: documentación oficial AWS sobre certificados y `sslmode=verify-full`: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.SSL.html
+
+**En CloudShell — ejecutar SOLO `--plan` (sin cambios en RDS):**
+
+```bash
+cd ~/cinegraph-aws
+git pull --ff-only origin main
+unset AWS_PROFILE
+export AWS_REGION=us-east-1
+
+WEB_INSTANCE_ID="$(aws cloudformation describe-stacks \
+  --stack-name cinegraph-e4-web \
+  --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue | [0]" \
+  --output text)"
+RDS_ENDPOINT="$(aws cloudformation describe-stacks \
+  --stack-name cinegraph-e4-postgres \
+  --query "Stacks[0].Outputs[?OutputKey=='DatabaseEndpoint'].OutputValue | [0]" \
+  --output text)"
+RDS_SECRET_ARN="$(aws rds describe-db-instances \
+  --db-instance-identifier cinegraph-e4-postgres \
+  --query 'DBInstances[0].MasterUserSecret.SecretArn' \
+  --output text)"
+
+PARAMS="$(python3 - "$AWS_REGION" "$RDS_ENDPOINT" "$RDS_SECRET_ARN" <<'PY'
+import json, shlex, sys
+region, host, secret = sys.argv[1:4]
+docker = (
+    "docker run --rm --network host --read-only "
+    "--tmpfs /tmp:rw,noexec,nosuid,nodev,size=16m "
+    "--cap-drop ALL --security-opt no-new-privileges "
+    "-e PYTHONDONTWRITEBYTECODE=1 "
+    "-e AWS_REGION=" + shlex.quote(region) + " "
+    "-e RDS_ENDPOINT=" + shlex.quote(host) + " "
+    "-e RDS_SECRET_ARN=" + shlex.quote(secret) + " "
+    "-v /opt/cinegraph/source:/workspace:ro "
+    "--entrypoint python cinegraph-e4-app:main "
+    "/workspace/infrastructure/aws/scripts/03-bootstrap-rds.py --plan"
+)
+commands = [
+    "set -euo pipefail",
+    "cd /opt/cinegraph/source",
+    "git pull --ff-only origin main",
+    "docker image inspect cinegraph-e4-app:main >/dev/null",
+    docker,
+]
+print(json.dumps({"commands": commands}))
+PY
+)"
+
+COMMAND_ID="$(aws ssm send-command \
+  --instance-ids "$WEB_INSTANCE_ID" \
+  --document-name AWS-RunShellScript \
+  --comment 'CineGraph - plan RDS TLS verify-full (sin escrituras)' \
+  --parameters "$PARAMS" \
+  --query 'Command.CommandId' --output text)"
+
+echo "SSM CommandId: $COMMAND_ID"
+aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$WEB_INSTANCE_ID"
+
+aws ssm get-command-invocation \
+  --command-id "$COMMAND_ID" --instance-id "$WEB_INSTANCE_ID" \
+  --query '{Estado:Status,Codigo:ResponseCode,Salida:StandardOutputContent,Error:StandardErrorContent}' \
+  --output json
+```
+
+**Resultado esperado:** `SOURCE_OK`, `RDS_CONNECTION_OK: PostgreSQL 16, TLS verify-full`, `PLAN_OK: sin escrituras a RDS` y recuentos de esquema. Si RDS no tiene tablas, `SCHEMA_MOVIES_EXISTS=False` y `RDS_MOVIES_CURRENT=0` son normales.
+
+**No ejecutar `--apply` aún.** Revisar el plan y, si es correcto, realizar la carga de manera controlada y transaccional. La operación de importación no borra registros, no genera rankings y no ejecuta el bootstrap local que imprime contraseñas. Las futuras cuentas de login serán independientes del usuario maestro de RDS.
 
 ## Próximas fases
 
