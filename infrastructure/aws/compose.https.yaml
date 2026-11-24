@@ -1,0 +1,30 @@
+# Proxy HTTPS de CineGraph para la EC2 existente.
+# Usa la red del host porque el contenedor Flask publica solo 127.0.0.1:8000.
+# No se inicia PostgreSQL, no se modifica Flask, y no hay credenciales aqui.
+name: cinegraph-e4-https
+
+services:
+  proxy:
+    image: caddy:2.11.9
+    container_name: cinegraph-e4-https
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      CINEGRAPH_HOST: ${CINEGRAPH_HOST:?Definir CINEGRAPH_HOST con el DNS de EC2}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=16m
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  caddy_data:
+  caddy_config:
