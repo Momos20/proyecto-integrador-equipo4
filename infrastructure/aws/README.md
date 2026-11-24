@@ -1700,3 +1700,11 @@ Resultados reportados de CloudShell/SSM:
 - Para emitir un certificado público posteriormente, se necesitarán puertos TCP 80/443 hacia la EC2, DNS apuntando a la IP actual, conectividad saliente con ACME y ausencia de límites de emisión.
 - Si cambia la IP pública de EC2, recalcular `CINEGRAPH_HOST` y repetir la verificación DNS antes de acceder al sitio. No divulgar como funcional hasta pasar `curl` HTTPS con validación estricta de certificado y los smoke tests de aplicación.
 
+
+## Pasos 31–34 — HTTPS público verificado (23 de noviembre de 2026, Colombia)
+
+- Paso 31: SSM `96590bf0-3ad1-40f0-8766-3925e205a6db`, Success, código 0. Caddy 2.11.9, `COMPOSE_HTTPS_VALID`, `CADDY_CONFIG_VALID`, `HTTPS_PREFLIGHT_OK`. Para validar la imagen usar `docker run --rm --network none --entrypoint caddy ... caddy:2.11.9 validate --config /etc/caddy/Caddyfile --adapter caddyfile`. La imagen no tiene entrypoint por defecto. Las pruebas unitarias de CloudShell no quedaron confirmadas.
+- Paso 32: stack `cinegraph-e4-https-ingress` CREATE_COMPLETE. SG web permite únicamente TCP 80/443 desde IPv4 pública. SG RDS permite 5432 exclusivamente desde SG web; RDS available y PubliclyAccessible=false.
+- Paso 33: SSM `a47b6a92-3690-4df7-b262-241aedd93f3a`, Success, código 0. Caddy activo en 80/443 y Flask healthy en 127.0.0.1:8000.
+- Paso 34: curl desde CloudShell confirmó TLS 1.3, certificado Let's Encrypt YE1 con hostname coincidente y OpenSSL verify result 0, vencimiento 2027-02-22 01:48:06 UTC. `/health` HTTP 200, HTTP redirige con 308 a HTTPS, `/` HTTP 200, `/api/ready` database=ok/status=ready, catálogo MovieLens 32M devuelve datos reales, `/api/recommendations` sin sesión HTTP 401.
+- URL observada: https://cinegraph-e4.3-84-177-220.sslip.io (IP efímera; verificar si cambia). Pendiente paso 35: login/logout desde navegador y prueba controlada de feedback. A9 aún no confirmado en RDS AWS.
