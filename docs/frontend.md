@@ -1,26 +1,22 @@
-# Interfaz CineGraph — diseño cinematográfico
+# CineGraph — Aplicación web
 
-Rediseño visual original, inspirado en patrones generales de plataformas de streaming (portada destacada, carrusel visual y tarjetas con póster), **sin incorporar código, componentes ni activos del repositorio Netflix-Clone** de terceros. Las tarjetas del catálogo son ilustrativas, no predicciones. Los pósteres remotos se solicitan al CDN de TMDB y tienen fallback visual si no están disponibles; el proyecto no redistribuye esas imágenes.
+CineGraph ofrece un catálogo cinematográfico de MovieLens 32M y recomendaciones personalizadas GraphSAGE A9. El frontend utiliza una portada cinematográfica original, filas horizontales de películas, búsqueda y tarjetas con imágenes TMDB cuando están disponibles.
 
-## Puntos que se mantuvieron funcionales
+## Funcionalidades
 
-- `GET /api/recommendations/<user_id>?limit=10`: el Top 10 sigue saliendo de PostgreSQL.
-- `POST /api/interactions`: Me gusta, No me gusta, Mi lista y calificaciones entre 0,5 y 5 estrellas.
-- Metadatos `model_version`, `position`, `cutoff_date` por cada acción.
-- Usuario demo `414`, loading, no-results y manejo de errores.
-- Filtro de texto **local** dentro del Top 10 devuelto, sin modificar resultados persistidos.
-- A9_sin_id como **único modelo seleccionado mostrado**; no se afirma que esté sirviendo todavía.
+- Autenticación mediante cuentas asociadas a usuarios MovieLens.
+- Ranking Top-10 personalizado, leído desde PostgreSQL mediante la API autenticada.
+- Interacciones: Me gusta, No me gusta, Mi lista y calificaciones.
+- Catálogo de 87.585 películas verificadas.
+- Identificación de la versión del modelo y fecha de corte histórica.
+- Pósteres TMDB referenciados mediante HTTPS; tarjeta tipográfica para títulos sin imagen.
 
-## Cómo verla
+## Despliegue
 
-```bash
-git switch main
-git pull origin main
-docker compose up -d --build
-```
+Flask/Gunicorn se ejecuta en EC2 mediante Docker, detrás de Caddy con HTTPS. PostgreSQL se encuentra en Amazon RDS privado. Consultar la [guía de AWS](../infrastructure/aws/README.md).
 
-Abrir http://localhost:8000. Desplazarse a «Mi selección», probar el usuario 414 y marcar una interacción para verificar feedback. Los datos de demostración identificados como `baseline-v0` siguen siendo los disponibles hasta que se integre la inferencia real.
+## Validación
 
-## Notas
+El ranking real de cine414 se verificó mediante la API autenticada y desde el navegador. Los rankings de cine123 y cine456 están publicados en RDS; sus capturas y la ejecución de la validación final de las tres cuentas están pendientes de confirmación.
 
-La galería de la portada contiene títulos del catálogo de demostración, no una lista ordenada por GraphSAGE. Los pósteres son imágenes promocionales de TMDB referenciadas por HTTPS. Las imágenes se pueden mejorar cuando el pipeline TMDB construya `poster_url` para el catálogo completo. Este rediseño **no habilita ningún pipeline automático**.
+Los pósteres se pueden enriquecer mediante el script `infrastructure/aws/scripts/20-final-validation.sh` con credenciales TMDB en Secrets Manager. No se modifica el ranking por enriquecer imágenes.
