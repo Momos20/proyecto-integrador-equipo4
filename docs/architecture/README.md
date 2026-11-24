@@ -11,3 +11,5 @@ El archivo `arquitectura_aws_final.drawio` es la fuente editable oficial del dia
 - `arquitectura_aws_academy_ec2.drawio`: copia adaptada al laboratorio AWS Academy; Caddy HTTPS, EC2 t3.large independiente para A9, Glue behavioral verificado, EventBridge deshabilitado y publicación pendiente. Flechas discontinuas indican flujos pendientes, propuestos o de monitorización. El entrenamiento periódico continúa como propuesta, no como ejecución real.
 
 SageMaker Processing rechazado por política Pvoclabs2. La instancia EC2 alternativa i-03306ae6540b03d3e fue creada y recibió el comando SSM 4e75f83c-4be5-4768-bc61-44881691065d. Inferencia lanzada, resultado aún no confirmado. No se ha publicado Top-K en RDS.
+
+Actualización: inferencia EC2 y publicación RDS verificadas el 24 noviembre 2026 UTC (30 recomendaciones reales, run_id=1). SSM de inferencia y publicación Success; prueba autenticada cine414 exitosa. Scoring y publicación manuales vía SSM; integración con Step Functions pendiente. Los diagramas originales permanecen intactos.
