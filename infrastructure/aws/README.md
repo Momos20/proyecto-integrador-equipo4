@@ -35,7 +35,8 @@ Los nombres S3 deben ser globalmente únicos. Si hay colisión, el despliegue fa
 | 11 | Consultar ofertas PostgreSQL 16/gp3 | **Completo**: 16.9–16.15, `db.t3.micro`, gp3, cifrado |
 | 12 | Crear PostgreSQL 16.15 privado | **Completo**: CloudFormation `CREATE_COMPLETE`, instancia `available` |
 | 13 | Verificar preparación EC2 | **Completo**: subred pública, rutas IGW, AMI AL2023, LabInstanceProfile y SG sin ingreso; secreto RDS activo |
-| 14 | Preparar instancia `cinegraph-e4-web` | **Siguiente**: confirmar acceso SSM e imagen, validar CloudFormation antes de crear |
+| 14 | Verificar AMI, IAM/SSM y plantilla de EC2 | **Completo**: AL2023 disponible, rol con AmazonSSMManagedInstanceCore, YAML válido |
+| 15 | Crear EC2 `cinegraph-e4-web` | **Siguiente**: ejecutar CloudFormation y comprobar instancia/SSM |
 
 **No quedan recursos de la primera pila**, según el resultado de CloudShell que compartió el equipo. Los scripts temporales de limpieza ya no forman parte del repositorio.
 
@@ -463,6 +464,68 @@ No confundir `CREATE_COMPLETE` con Docker configurado: el `UserData` se ejecuta 
 
 **Costos:** EC2 `t3.small`, EBS gp3 e IPv4 pública son cobrables. RDS está `available` y ya consume presupuesto. Detener recursos cuando no se utilicen y cerrar el laboratorio cuando termine la demostración.
 
+
+## Paso 14 — Validaciones EC2 completadas (resultado real)
+
+El laboratorio devolvió la AMI `ami-0aacbf72109c53c0c` en estado `available`, arquitectura `x86_64`, dispositivo raíz `/dev/xvda`. El rol `LabRole`, asociado a `LabInstanceProfile`, tiene adjunta la política administrada `AmazonSSMManagedInstanceCore` junto con otras políticas del laboratorio. `aws ssm describe-instance-information` funcionó, pero devolvió una lista vacía porque aún no había instancias gestionadas. `cloudformation validate-template` aprobó `04-web-ec2.yaml`. Estas comprobaciones **no demuestran todavía que el operador tenga `ssm:StartSession`**.
+
+## Paso 15 — Creación de EC2 con Docker (siguiente)
+
+Esta fase **sí genera costos de EC2, EBS e IPv4 pública**. Usa la subred web **pública** confirmada anteriormente; la tabla de rutas DB continúa siendo privada. No se abre ni SSH ni el puerto de Flask. El despliegue instalará Docker mediante UserData, pero **no instalará aún CineGraph ni conectará RDS**.
+
+```bash
+cd ~/cinegraph-aws
+git pull --ff-only origin main
+unset AWS_PROFILE
+export AWS_REGION=us-east-1
+export WEB_SUBNET_ID=subnet-07413c35ec3498c14
+
+APP_SG="$(aws cloudformation describe-stacks \
+  --stack-name cinegraph-e4-foundation \
+  --query "Stacks[0].Outputs[?OutputKey=='AppSecurityGroupId'].OutputValue | [0]" \
+  --output text)"
+
+echo "Subnet: $WEB_SUBNET_ID | SG: $APP_SG"
+aws cloudformation validate-template \
+  --template-body file://infrastructure/aws/cloudformation/04-web-ec2.yaml
+
+# Crea recursos reales: no ejecutar sin presupuesto disponible.
+aws cloudformation deploy \
+  --region "$AWS_REGION" \
+  --stack-name cinegraph-e4-web \
+  --template-file infrastructure/aws/cloudformation/04-web-ec2.yaml \
+  --parameter-overrides "WebSubnetId=$WEB_SUBNET_ID" "AppSecurityGroupId=$APP_SG" \
+  --tags Project=CineGraph Team=E4 Environment=lab \
+  --no-fail-on-empty-changeset
+```
+
+**Confirmar Outputs y estado real, sin imprimir secretos:**
+
+```bash
+aws cloudformation describe-stacks \
+  --stack-name cinegraph-e4-web \
+  --query 'Stacks[0].{Estado:StackStatus,Recursos:Outputs}' \
+  --output json
+
+WEB_INSTANCE_ID="$(aws cloudformation describe-stacks \
+  --stack-name cinegraph-e4-web \
+  --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue | [0]" \
+  --output text)"
+
+aws ec2 describe-instances \
+  --instance-ids "$WEB_INSTANCE_ID" \
+  --query 'Reservations[].Instances[].[InstanceId,State.Name,PrivateIpAddress,PublicIpAddress]' \
+  --output table
+
+aws ssm describe-instance-information \
+  --filters "Key=InstanceIds,Values=$WEB_INSTANCE_ID" \
+  --query 'InstanceInformationList[].[InstanceId,PingStatus,PlatformName]' \
+  --output table
+```
+
+`CREATE_COMPLETE` no garantiza que UserData haya terminado ni que SSM esté en línea. El estado deseado es `running` en EC2, después `Online` en SSM. Si no aparece en SSM, comprobar registro del agente, rutas salientes, permisos de sesión y estado del arranque antes de modificar SG o abrir SSH.
+
+**No usar el Compose local:** contiene PostgreSQL dentro de Docker y contraseñas ficticias. El siguiente paso será implantar la aplicación con un Compose exclusivo para AWS y autenticación segura hacia RDS. La URL pública no tendrá login hasta contar con un certificado HTTPS válido.
 
 ## Próximas fases
 
